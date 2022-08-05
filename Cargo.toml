@@ -2,6 +2,7 @@
 name = "multiplayer_client_rust"
 version = "0.1.0"
 edition = "2021"
+resolver = "2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -14,6 +15,13 @@ pollster = "0.2"
 bytemuck = { version = "1.4", features = [ "derive" ] }
 anyhow = "1.0"
 cgmath = "0.18"
+tobj = { version = "3.2.1", features = [
+    "async",
+]}
+imgui = "0.8"
+imgui-wgpu = "0.20"
+imgui-winit-support = {version ="0.8", features = [ "winit-26" ]}
+
 
 [build-dependencies]
 anyhow = "1.0"
