@@ -39,16 +39,6 @@ struct State {
     // Render Pipelin
     render_pipeline: wgpu::RenderPipeline,
 
-    // Vertex and indices things
-    vertex_buffer: wgpu::Buffer,
-    num_vertices: u32,
-    index_buffer: wgpu::Buffer, 
-    num_indices: u32,
-
-    // Texture states
-    diffuse_bind_group: wgpu::BindGroup,
-    diffuse_texture: texture::Texture,
-
     // Camera stuff
     camera: camera::Camera,
     camera_uniform: camera::CameraUniform,
@@ -174,11 +164,6 @@ impl State {
             }],
             label: None,
         });
-
-        // Temporary code will be removed when actual work is being done
-        let diffuse_bytes = include_bytes!("../happy-tree.png");
-        let diffuse_texture = texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png").unwrap();
-        // end of temporary code
         
         let texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
@@ -219,23 +204,8 @@ impl State {
                 ],
                 label: Some("texture_bind_group_layout"),
         });
+        let depth_texture = texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
-        let diffuse_bind_group = device.create_bind_group(
-            &wgpu::BindGroupDescriptor {
-                layout: &texture_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
-                    }
-                ],
-                label: Some("diffuse_bind_group"),
-            }
-        );
 
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
@@ -246,22 +216,6 @@ impl State {
             ],
             push_constant_ranges: &[],
         });
-
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(vertex::VERTICES),
-            usage: wgpu::BufferUsages::VERTEX
-        });
-        
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(vertex::INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-
-        let depth_texture = texture::Texture::create_depth_texture(&device, &config, "depth_texture");
-
-        
 
         let render_pipeline = {
             let shader = wgpu::ShaderModuleDescriptor {
@@ -298,10 +252,6 @@ impl State {
             )
         };
 
-        let num_vertices = vertex::VERTICES.len() as u32;
-        
-        let num_indices = vertex::INDICES.len() as u32;
-
         const NUM_INSTANCES_PER_ROW: u32 = 3;
 
         const SPACE_BETWEEN: f32 = 3.0;
@@ -334,7 +284,7 @@ impl State {
         );
 
         let obj_model = resources::load_model(
-            "cube.obj",
+            "Models/cube.obj",
             &device,
             &queue,
             &texture_bind_group_layout,
@@ -350,12 +300,6 @@ impl State {
             size,
             ui,
             render_pipeline,
-            vertex_buffer,
-            num_vertices,
-            index_buffer,
-            num_indices,
-            diffuse_bind_group,
-            diffuse_texture,
             camera,
             camera_uniform,
             camera_buffer,
@@ -434,8 +378,10 @@ impl State {
             use model::DrawModel;
             render_pass.set_pipeline(&&self.render_pipeline);
             render_pass.draw_model_instanced(&self.obj_model, 0..self.instances.len() as u32, &self.camera_bind_group, &self.light_bind_group);
+            
         }
         self.queue.submit(std::iter::once(encoder.finish()));
+        self.ui.draw(window, &self.device, &self.queue, &view);
         output.present();
 
         Ok(())
@@ -497,6 +443,7 @@ pub async fn run() {
             }
             _ => {}
         }
+        state.ui.handle_input(&window, &event);
     });
     
      

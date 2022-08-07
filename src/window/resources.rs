@@ -1,4 +1,4 @@
-use std::io::{BufReader, Cursor};
+use std::{io::{BufReader, Cursor}, path::Path};
 
 use wgpu::util::DeviceExt;
 
@@ -8,7 +8,7 @@ pub async fn load_string(file_name: &str) -> anyhow::Result<String> {
     let path = std::path::Path::new(env!("OUT_DIR"))
         .join("res")
         .join(file_name);
-    let txt = std::fs::read_to_string(path)?;
+    let txt = std::fs::read_to_string(path).unwrap();
     Ok(txt)
 }
 
@@ -36,6 +36,7 @@ pub async fn load_model(
     queue: &wgpu::Queue,
     layout: &wgpu::BindGroupLayout,
 ) -> anyhow::Result<model::Model> {
+    let path = Path::new(file_name).parent().unwrap().to_str().unwrap();
     let obj_text = load_string(file_name).await?;
     let obj_cursor = Cursor::new(obj_text);
     let mut obj_reader = BufReader::new(obj_cursor);
@@ -48,7 +49,7 @@ pub async fn load_model(
             ..Default::default()
         },
         |p| async move {
-            let mat_text = load_string(&p).await.unwrap();
+            let mat_text = load_string(&format!("{}/{}", path, &p)).await.unwrap();
             tobj::load_mtl_buf(&mut BufReader::new(Cursor::new(mat_text)))
         },
     )
@@ -68,6 +69,14 @@ pub async fn load_model(
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&normal_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&normal_texture.sampler),
                 },
             ],
             label: None,

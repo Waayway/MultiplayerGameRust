@@ -97,8 +97,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let result = (ambient_color + diffuse_color + specular_color) * object_color.xyz;
 
-    let final_result = 
-
     let final_result = vec4<f32>(result, object_color.a);
 
     return final_result;

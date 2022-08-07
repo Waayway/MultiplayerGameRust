@@ -1,12 +1,16 @@
-use std::time::{Instant, Duration};
+use std::time::{Instant};
 use imgui_wgpu::Renderer;
-use winit::window::Window;
+use winit::{
+    event::{Event},
+    window::Window,
+};
 
 
 pub struct UI {
     imgui: imgui::Context,
     imgui_platform: imgui_winit_support::WinitPlatform,
     renderer: Renderer,
+    demo_open: bool,
     last_frame: Instant,
     last_cursor: Option<imgui::MouseCursor>,
 }
@@ -23,7 +27,6 @@ impl UI {
         imgui.set_ini_filename(None);
 
         let font_size = (13.0 * hidpi_factor) as f32;
-        imgui.io_mut().font_global_scale = (1.0 / font_size) as f32;
 
         imgui.fonts().add_font(&[imgui::FontSource::DefaultFontData {
             config: Some(imgui::FontConfig {
@@ -33,84 +36,80 @@ impl UI {
                 ..Default::default()
             }),
         }]);
-        
-        let clear_color = wgpu::Color {
-            r: 0.1,
-            g: 0.2,
-            b: 0.3,
-            a: 1.0,
-        };
-    
+   
         let renderer_config = imgui_wgpu::RendererConfig {
             texture_format: surface_config.format,
             ..Default::default()
         };
     
-        let mut renderer = Renderer::new(&mut imgui, &device, &queue, renderer_config);
+        let renderer = Renderer::new(&mut imgui, &device, &queue, renderer_config);
     
-        let mut last_frame = Instant::now();
-        let mut demo_open = true;
+        let last_frame = Instant::now();
+        let demo_open = true;
     
-        let mut last_cursor: Option<imgui::MouseCursor> = None;
+        let last_cursor: Option<imgui::MouseCursor> = None;
 
         Self { 
             imgui, 
             imgui_platform,
             renderer,
+            demo_open,
             last_frame,
             last_cursor,
         }
     }
-    pub fn draw<'a>(&'a mut self, window: &Window ,device: &wgpu::Device, queue: &wgpu::Queue, surface: &wgpu::Surface, render_pass: &mut wgpu::RenderPass<'a>) -> &'a bool {
+    pub fn draw(&mut self, window: &Window ,device: &wgpu::Device, queue: &wgpu::Queue, surface_view: &wgpu::TextureView) {
         let delta_s = self.last_frame.elapsed();
         let now = Instant::now();
         self.imgui.io_mut().update_delta_time(now - self.last_frame);
         self.last_frame = now;
 
-        let frame = match surface.get_current_texture() {
-            Ok(frame) => frame,
-            Err(e) => {
-                eprintln!("dropped frame: {:?}", e);
-                return &false;
-            }
-        };
         self.imgui_platform.prepare_frame(self.imgui.io_mut(), &window).expect("Failed to prepare frame");
         let ui = self.imgui.frame();
-        self.build_windows(&ui, delta_s, true);
+        {
+            let window = imgui::Window::new("Information");
+            window
+                .size([300.0, 100.0], imgui::Condition::FirstUseEver)
+                .build(&ui, || {
+                    let mouse_pos = ui.io().mouse_pos;
+                    let fps = (1000.0 / delta_s.as_millis() as f32).round() as i32;
+                    ui.text(format!("Mouse Position: ({:.1},{:.1})", mouse_pos[0], mouse_pos[1]));
+                    ui.text(format!("FPS: {:?}", fps));
+                    ui.text(format!("Frametime: {:?}", delta_s));
+                });
+        }
+
+        let mut encoder: wgpu::CommandEncoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Imgui Encoder"), 
+        });
 
         if self.last_cursor != ui.mouse_cursor() {
             self.last_cursor = ui.mouse_cursor();
             self.imgui_platform.prepare_render(&ui, &window);
         }
-        self.renderer
-                    .render(ui.render(), &queue, &device, render_pass)
-                    .expect("Rendering failed");
-                
-        return &true;
-    }
-    
-    fn build_windows(&mut self, ui: &imgui::Ui, delta_s: Duration, mut demo_open: bool) {
-        let window = imgui::Window::new("Hello world");
-        window
-            .size([300.0, 100.0], imgui::Condition::FirstUseEver)
-            .build(&ui, || {
-                ui.text("Hello world!");
-                ui.text("This...is...imgui-rs on WGPU!");
-                ui.separator();
-                let mouse_pos = ui.io().mouse_pos;
-                ui.text(format!(
-                    "Mouse Position: ({:.1},{:.1})",
-                    mouse_pos[0], mouse_pos[1]
-                ));
-            });
-        let window = imgui::Window::new("Hello too");
-        window
-            .size([400.0, 200.0], imgui::Condition::FirstUseEver)
-            .position([400.0, 200.0], imgui::Condition::FirstUseEver)
-            .build(&ui, || {
-                ui.text(format!("Frametime: {:?}", delta_s));
-            });
 
-        ui.show_demo_window(&mut demo_open);
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: surface_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
+            self.renderer
+                    .render(ui.render(), &queue, &device, &mut render_pass)
+                    .expect("Rendering failed");
+        }
+
+        queue.submit(Some(encoder.finish()));
+    }
+    pub fn handle_input<T>(&mut self, window: &Window, event: &Event<T>) -> bool{
+        self.imgui_platform.handle_event(self.imgui.io_mut(), window, event);
+        return true;
     }
 }
