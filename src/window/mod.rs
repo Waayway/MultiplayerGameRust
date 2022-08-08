@@ -55,6 +55,7 @@ struct State {
 
     // Model testing stuff
     obj_model: model::Model,
+    cube_model: model::Model,
 
     // Light stuff
     light_uniform: light::LightUniform,
@@ -126,12 +127,7 @@ impl State {
 
         let camera_controller = camera::CameraController::new(0.2);
 
-        let light_uniform = light::LightUniform {
-            position: [2.0, 2.0, 2.0],
-            _padding: 0,
-            color: [1.0, 1.0, 1.0],
-            _padding2: 0,
-        };
+        let light_uniform = light::LightUniform::new(0, [2.0, 2.0, 2.0], [1.0, 1.0, 1.0], 1.0, 1.0);
         
         let light_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
@@ -201,6 +197,16 @@ impl State {
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    }
                 ],
                 label: Some("texture_bind_group_layout"),
         });
@@ -252,21 +258,22 @@ impl State {
             )
         };
 
-        const NUM_INSTANCES_PER_ROW: u32 = 3;
+        const NUM_INSTANCES_PER_ROW: u32 = 1;
 
-        const SPACE_BETWEEN: f32 = 3.0;
-        let instances = (0..NUM_INSTANCES_PER_ROW).flat_map(|z| {
-            (0..NUM_INSTANCES_PER_ROW).map(move |x| {
-                let x = SPACE_BETWEEN * (x as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
-                let z = SPACE_BETWEEN * (z as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
+        // const SPACE_BETWEEN: f32 = 3.0;
+        let instances = (0..NUM_INSTANCES_PER_ROW).flat_map(|_z| {
+            (0..NUM_INSTANCES_PER_ROW).map(move |_x| {
+                // let x = SPACE_BETWEEN * (x as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
+                // let z = SPACE_BETWEEN * (z as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
 
-                let position = cgmath::Vector3 { x, y: 0.0, z };
+                let position = cgmath::Vector3 { x: 0.0, y: 0.0, z: 0.0 };
 
-                let rotation = if position.is_zero() {
-                    cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
-                } else {
-                    cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
-                };
+                // let rotation = if position.is_zero() {
+                //     cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
+                // } else {
+                //     cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
+                // };
+                let rotation = cgmath::Quaternion::from_axis_angle((0.0, 1.0, 0.0).into(), cgmath::Deg(180.0));
                 instances::Instance {
                     position, rotation,
                 }
@@ -288,7 +295,14 @@ impl State {
             &device,
             &queue,
             &texture_bind_group_layout,
-        ).await.unwrap();        
+        ).await.unwrap();       
+
+        let cube_model = resources::load_model(
+            "Models/cube.obj",
+            &device,
+            &queue,
+            &texture_bind_group_layout,
+        ).await.unwrap();    
 
                 
 
@@ -309,6 +323,7 @@ impl State {
             instance_buffer,
             depth_texture,
             obj_model,
+            cube_model,
             light_uniform,
             light_buffer,
             light_bind_group,
@@ -322,7 +337,8 @@ impl State {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
-            self.depth_texture = texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture")
+            self.depth_texture = texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
+            self.camera.resize(new_size.width, new_size.height);
         }
     }
 
@@ -334,9 +350,9 @@ impl State {
         self.camera_controller.update_camera(&mut self.camera);
         self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
-        let old_position: cgmath::Vector3<_> = self.light_uniform.position.into();
-        self.light_uniform.position = (cgmath::Quaternion::from_axis_angle((0.0, 1.0, 0.0).into(), cgmath::Deg(1.0)) * old_position).into();
-        self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
+        // let old_position: cgmath::Vector3<_> = self.light_uniform.position.into();
+        // self.light_uniform.position = (cgmath::Quaternion::from_axis_angle((0.0, 1.0, 0.0).into(), cgmath::Deg(1.0)) * old_position).into();
+        // self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
     }
 
     fn render(&mut self, window: &Window) -> Result<(), wgpu::SurfaceError> {
@@ -373,7 +389,7 @@ impl State {
             use model::DrawLight;
             render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             render_pass.set_pipeline(&&self.light_render_pipeline);
-            render_pass.draw_light_model(&self.obj_model, &self.camera_bind_group, &self.light_bind_group);
+            render_pass.draw_light_model(&self.cube_model, &self.camera_bind_group, &self.light_bind_group);
             
             use model::DrawModel;
             render_pass.set_pipeline(&&self.render_pipeline);

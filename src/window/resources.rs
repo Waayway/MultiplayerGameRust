@@ -2,14 +2,14 @@ use std::{io::{BufReader, Cursor}, path::Path};
 
 use wgpu::util::DeviceExt;
 
-use super::{texture, model};
+use super::{texture, model::{self, MaterialUniform}};
 
 pub async fn load_string(file_name: &str) -> anyhow::Result<String> {
     let path = std::path::Path::new(env!("OUT_DIR"))
         .join("res")
         .join(file_name);
     let txt = std::fs::read_to_string(path).unwrap();
-    println!("{}", txt);
+    
     Ok(txt)
 }
 
@@ -56,63 +56,85 @@ pub async fn load_model(
     )
     .await?;
     let mut materials = Vec::new();
-    for m in obj_materials? {
-        let binding0: wgpu::BindingResource;
-        let binding1: wgpu::BindingResource;
-        let binding2: wgpu::BindingResource;
-        let binding3: wgpu::BindingResource;
-
-        let diffuse_texture_temp: Option<texture::Texture> = if !m.diffuse_texture.is_empty() {
-            Some(load_texture(&m.diffuse_texture, device, queue).await?)
+    for mat in obj_materials? {
+        let diffuse_path = mat.diffuse_texture;
+        let diffuse_texture_w = if diffuse_path != "" {
+            Some(load_texture(&format!("{}/{}", path, &diffuse_path), device, queue).await?)
         } else {
             None
         };
-        let diffuse_texture = if diffuse_texture_temp.is_some() {
-            diffuse_texture_temp.unwrap()
-        } else {
-            texture::Texture::new(device)
-        };
-        binding0 = wgpu::BindingResource::TextureView(&diffuse_texture.view);
-        binding1 = wgpu::BindingResource::Sampler(&diffuse_texture.sampler);
-
-        let normal_texture_temp: Option<texture::Texture> = if !m.normal_texture.is_empty() {
-            Some(load_texture(&m.normal_texture, device, queue).await?)
+        let normal_path = mat.normal_texture;
+        let normal_texture_w = if normal_path != "" {
+            Some(load_texture(&format!("{}/{}", path, &normal_path), device, queue).await?)
         } else {
             None
         };
-        let normal_texture = if normal_texture_temp.is_some() {
-            normal_texture_temp.unwrap()
-        } else {
-            texture::Texture::new(device)
+
+        let material_uniform = MaterialUniform {
+            use_texture: if diffuse_texture_w.is_some() { 1 } else { 0 },
+            _p1: [0.0; 3],
+            ambient_color: mat.ambient.into(),
+            _p2: 0,
+            diffuse_color: mat.diffuse.into(),
+            _p3: 0,
+            specular_color: mat.specular.into(),
+            _p4: 0,
         };
-        binding2 = wgpu::BindingResource::TextureView(&normal_texture.view);
-        binding3 = wgpu::BindingResource::Sampler(&normal_texture.sampler);
+
+        let mat_uniform_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Material Uniform Buffer"),
+                contents: bytemuck::cast_slice(&[material_uniform]),
+                usage: wgpu::BufferUsages::UNIFORM,
+            }
+        );
+
+        let diffuse_texture = if diffuse_texture_w.is_some() {
+            diffuse_texture_w.unwrap()
+        } else {
+            load_texture("assets/default_texture.png", device, queue).await?
+        };
+        let normal_texture = if normal_texture_w.is_some() {
+            normal_texture_w.unwrap()
+        } else {
+            load_texture("assets/default_texture.png", device, queue).await?
+        };
+
+        let diffuse_texture_bind_group: wgpu::BindingResource = wgpu::BindingResource::TextureView(&diffuse_texture.view);
+        let diffuse_sampler_bind_group: wgpu::BindingResource = wgpu::BindingResource::Sampler(&diffuse_texture.sampler);
+        let normal_texture_bind_group: wgpu::BindingResource = wgpu::BindingResource::TextureView(&normal_texture.view);
+        let normal_sampler_bind_group: wgpu::BindingResource = wgpu::BindingResource::Sampler(&normal_texture.sampler);
+        let mat_uniform_bind_group: wgpu::BindingResource = mat_uniform_buffer.as_entire_binding();
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: binding0,
+                    resource: diffuse_texture_bind_group,
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: binding1,
+                    resource: diffuse_sampler_bind_group,
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: binding2,
+                    resource: normal_texture_bind_group,
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: binding3,
+                    resource: normal_sampler_bind_group,
                 },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: mat_uniform_bind_group,
+                }
             ],
             label: None,
         });
-        let diffuse_color = m.diffuse;
+        let diffuse_color = mat.diffuse;
         materials.push(model::Material {
-            name: m.name,
+            name: mat.name,
             diffuse_texture,
             normal_texture,
             diffuse_color,

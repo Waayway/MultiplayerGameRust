@@ -15,6 +15,19 @@ pub struct Material {
     pub bind_group: wgpu::BindGroup,
 }
 
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct MaterialUniform {
+    pub use_texture: u32,
+    pub _p1: [f32; 3],
+    pub ambient_color: [f32; 3],
+    pub _p2: u32,
+    pub diffuse_color: [f32; 3],
+    pub _p3: u32,
+    pub specular_color: [f32; 3],
+    pub _p4: u32,
+}
+
 pub struct Mesh {
     pub name: String,
     pub vertex_buffer: wgpu::Buffer,
@@ -58,70 +71,6 @@ impl Vertex for ModelVertex {
                     format: wgpu::VertexFormat::Float32x3,
                 },
             ],
-        }
-    }
-}
-
-impl Material {
-    pub fn new(
-        device: &wgpu::Device,
-        name: &str,
-        diffuse_texture: Option<texture::Texture>,
-        normal_texture: Option<texture::Texture>,
-        diffuse_color: [f32; 3],
-        layout: &wgpu::BindGroupLayout,
-    ) -> Self {
-        let binding0: wgpu::BindingResource;
-        let binding1: wgpu::BindingResource;
-        let binding2: wgpu::BindingResource;
-        let binding3: wgpu::BindingResource;
-
-        
-        let diffuse_texture = if diffuse_texture.is_some() {
-            diffuse_texture.unwrap()
-        } else {
-            texture::Texture::new(device)
-        };
-        binding0 = wgpu::BindingResource::TextureView(&diffuse_texture.view);
-        binding1 = wgpu::BindingResource::Sampler(&diffuse_texture.sampler);
-        
-        let normal_texture = if normal_texture.is_some() {
-            normal_texture.unwrap()
-        } else {
-            texture::Texture::new(device)
-        };
-        binding2 = wgpu::BindingResource::TextureView(&normal_texture.view);
-        binding3 = wgpu::BindingResource::Sampler(&normal_texture.sampler);
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: binding0,
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: binding1,
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: binding2,
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: binding3,
-                },
-            ],
-            label: Some(name),
-        });
-        
-        Self {
-            name: String::from(name),
-            diffuse_texture,
-            normal_texture, // NEW!
-            diffuse_color,
-            bind_group,
         }
     }
 }

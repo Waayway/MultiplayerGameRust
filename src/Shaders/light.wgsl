@@ -11,6 +11,11 @@ var<uniform> camera: Camera;
 struct Light {
     position: vec3<f32>,
     color: vec3<f32>,
+    intensity: f32,
+    radius: f32,
+    is_spotlight: i32,
+    limitcos_inner: f32,
+    limitcos_outer: f32,
 }
 @group(1) @binding(0)
 var<uniform> light: Light;

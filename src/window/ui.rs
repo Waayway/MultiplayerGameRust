@@ -10,7 +10,6 @@ pub struct UI {
     imgui: imgui::Context,
     imgui_platform: imgui_winit_support::WinitPlatform,
     renderer: Renderer,
-    demo_open: bool,
     last_frame: Instant,
     last_cursor: Option<imgui::MouseCursor>,
 }
@@ -45,7 +44,6 @@ impl UI {
         let renderer = Renderer::new(&mut imgui, &device, &queue, renderer_config);
     
         let last_frame = Instant::now();
-        let demo_open = true;
     
         let last_cursor: Option<imgui::MouseCursor> = None;
 
@@ -53,7 +51,6 @@ impl UI {
             imgui, 
             imgui_platform,
             renderer,
-            demo_open,
             last_frame,
             last_cursor,
         }
@@ -70,6 +67,7 @@ impl UI {
             let window = imgui::Window::new("Information");
             window
                 .size([300.0, 100.0], imgui::Condition::FirstUseEver)
+                .position([0.0; 2], imgui::Condition::Always)
                 .build(&ui, || {
                     let mouse_pos = ui.io().mouse_pos;
                     let fps = (1000.0 / delta_s.as_millis() as f32).round() as i32;

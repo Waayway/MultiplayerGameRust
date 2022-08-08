@@ -28,6 +28,9 @@ impl Camera {
 
         return OPENGL_TO_WGPU_MATRIX * proj * view
     }
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.aspect = width as f32 / height as f32;
+    }
     pub fn create_camera_buffers_and_uniform(&self, device: &wgpu::Device) -> (CameraUniform, wgpu::Buffer, wgpu::BindGroupLayout, wgpu::BindGroup) {
         let mut camera_uniform = CameraUniform::new();
         camera_uniform.update_view_proj(&self);
