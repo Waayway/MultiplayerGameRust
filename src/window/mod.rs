@@ -284,7 +284,7 @@ impl State {
         );
 
         let obj_model = resources::load_model(
-            "Models/cube.obj",
+            "Models1/test.obj",
             &device,
             &queue,
             &texture_bind_group_layout,
