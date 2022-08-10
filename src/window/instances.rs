@@ -1,4 +1,5 @@
 use cgmath;
+use wgpu::util::DeviceExt;
 
 use super::model;
 
@@ -14,7 +15,11 @@ pub struct InstanceRaw {
     model: [[f32; 4]; 4],
     normal: [[f32; 3]; 3],
 }
- 
+
+pub struct InstanceBuffer {
+    pub buffer: wgpu::Buffer,
+}
+
 impl Instance {
     pub fn to_raw(&self) -> InstanceRaw {
         InstanceRaw {
@@ -76,5 +81,19 @@ impl model::Vertex for InstanceRaw {
                 },
             ],
         }
+    }
+}
+
+impl InstanceBuffer {
+    pub fn new(device: &wgpu::Device, instances: &Vec<Instance>) -> Self{
+        let instance_raws = instances.iter().map(|instance| instance.to_raw()).collect::<Vec<_>>();
+        let instance_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Instance Buffer"),
+                contents: bytemuck::cast_slice(&instance_raws),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+        Self { buffer: instance_buffer }
     }
 }

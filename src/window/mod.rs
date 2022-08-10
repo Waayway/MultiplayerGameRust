@@ -9,8 +9,6 @@ pub mod light;
 pub mod render_pipeline;
 pub mod ui;
 
-// WGPU Imports
-use wgpu::util::DeviceExt;
 
 // winit Imports
 use winit::{
@@ -20,9 +18,8 @@ use winit::{
     window::Window,
 };
 
-use cgmath::prelude::*;
-
 use crate::window::model::{Vertex};
+
 
 // All of the states needed for running the game
 struct State {
@@ -48,7 +45,7 @@ struct State {
 
     // Instancing
     instances: Vec<instances::Instance>,
-    instance_buffer: wgpu::Buffer,
+    instance_buffer: instances::InstanceBuffer,
 
     //Depth buffer
     depth_texture: texture::Texture,
@@ -58,8 +55,8 @@ struct State {
     cube_model: model::Model,
 
     // Light stuff
-    light_uniform: light::LightUniform,
-    light_buffer: wgpu::Buffer,
+    light0: light::Light,
+    light_buffer: light::LightBuffer,
     light_bind_group: wgpu::BindGroup,
     light_render_pipeline: wgpu::RenderPipeline,
 }
@@ -127,15 +124,9 @@ impl State {
 
         let camera_controller = camera::CameraController::new(0.2);
 
-        let light_uniform = light::LightUniform::new(0, [2.0, 2.0, 2.0], [1.0, 1.0, 1.0], 1.0, 1.0);
+        let light0 = light::Light::new(0, [2.0, 2.0, 2.0].into(), [1.0, 1.0, 1.0].into(), 1.0, 1.0);
         
-        let light_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Light VB"),
-                contents: bytemuck::cast_slice(&[light_uniform]),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            }
-        );
+        let light_buffer = light::LightBuffer::new(&device, &vec![light0]);
 
         let light_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -156,7 +147,7 @@ impl State {
             layout: &light_bind_group_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: light_buffer.as_entire_binding(),
+                resource: light_buffer.buffer.as_entire_binding(),
             }],
             label: None,
         });
@@ -258,37 +249,12 @@ impl State {
             )
         };
 
-        const NUM_INSTANCES_PER_ROW: u32 = 1;
+        let instance_vec = vec![instances::Instance {
+            position: cgmath::Vector3::new(0.0,0.0,0.0),
+            rotation: cgmath::Quaternion::new(0.0,0.0,0.0,0.0),
+        }];
 
-        // const SPACE_BETWEEN: f32 = 3.0;
-        let instances = (0..NUM_INSTANCES_PER_ROW).flat_map(|_z| {
-            (0..NUM_INSTANCES_PER_ROW).map(move |_x| {
-                // let x = SPACE_BETWEEN * (x as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
-                // let z = SPACE_BETWEEN * (z as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
-
-                let position = cgmath::Vector3 { x: 0.0, y: 0.0, z: 0.0 };
-
-                // let rotation = if position.is_zero() {
-                //     cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
-                // } else {
-                //     cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
-                // };
-                let rotation = cgmath::Quaternion::from_axis_angle((0.0, 1.0, 0.0).into(), cgmath::Deg(180.0));
-                instances::Instance {
-                    position, rotation,
-                }
-            })
-        }).collect::<Vec<_>>();
-
-
-        let instance_data = instances.iter().map(instances::Instance::to_raw).collect::<Vec<_>>();
-        let instance_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Instance Buffer"),
-                contents: bytemuck::cast_slice(&instance_data),
-                usage: wgpu::BufferUsages::VERTEX,
-            }
-        );
+        let instance_buffer = instances::InstanceBuffer::new(&device, &instance_vec);
 
         let obj_model = resources::load_model(
             "Models1/test.obj",
@@ -319,12 +285,12 @@ impl State {
             camera_buffer,
             camera_bind_group,
             camera_controller,
-            instances,
-            instance_buffer,
+            instances: instance_vec,
+            instance_buffer: instance_buffer,
             depth_texture,
             obj_model,
             cube_model,
-            light_uniform,
+            light0,
             light_buffer,
             light_bind_group,
             light_render_pipeline
@@ -387,7 +353,7 @@ impl State {
                 }),
             });
             use model::DrawLight;
-            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.instance_buffer.buffer.slice(..));
             render_pass.set_pipeline(&&self.light_render_pipeline);
             render_pass.draw_light_model(&self.cube_model, &self.camera_bind_group, &self.light_bind_group);
             
