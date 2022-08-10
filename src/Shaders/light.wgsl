@@ -18,7 +18,7 @@ struct Light {
     limitcos_outer: f32,
 }
 @group(1) @binding(0)
-var<uniform> light: Light;
+var<storage> light: array<Light>;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -35,8 +35,8 @@ fn vs_main(
 ) -> VertexOutput {
     let scale = 0.25;
     var out: VertexOutput;
-    out.clip_position = camera.view_proj * vec4<f32>(model.position * scale + light.position, 1.0);
-    out.color = light.color;
+    out.clip_position = camera.view_proj * vec4<f32>(model.position * scale + light[0].position, 1.0);
+    out.color = light[0].color;
     return out;
 }
 

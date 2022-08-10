@@ -10,9 +10,18 @@ var<uniform> camera: Camera;
 struct Light {
     position: vec3<f32>,
     color: vec3<f32>,
+    intensity: f32,
+    radius: f32,
+    is_spotlight: i32,
+    limitcos_inner: f32,
+    limitcos_outer: f32,
+    limitdir: vec3<f32>,
 }
 @group(2) @binding(0)
-var<uniform> light: Light;
+var<storage> lights: array<Light>;
+
+@group(2) @binding(1)
+var<uniform> light_num: i32;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -97,10 +106,50 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
     
     var result = vec3(0.0,0.0,0.0);
-    result = object_color.xyz;
-
+    
+    //result = object_color.xyz; // Static Colors no Shadow
+        
     var light_hit: f32 = 0.0;
 
+    for (var i: i32 = 0; i < light_num; i=i+1) {
+        var l_position = lights[i].position;
+        var l_color = lights[i].color;
+        var l_intensity = lights[i].intensity;
+        var l_radius = lights[i].radius;
+        var l_is_spotlight: f32 = f32(lights[i].is_spotlight);
+
+        var surface_to_light = normalize(l_position - in.world_position);
+
+        var spot_target_check: f32 = dot(surface_to_light, -lights[i].limitdir);
+
+        var in_light = max(1.0 - l_is_spotlight, smoothstep(
+                lights[i].limitcos_outer,
+                lights[i].limitcos_inner,
+                spot_target_check
+            ));
+
+        l_radius = max(l_radius, 0.00001);
+        
+        var ambient_color = l_color * l_radius / max(l_radius, distance(l_position, in.world_position));
+        ambient_color = ambient_color * in_light;
+        
+        var normal = normalize(in.world_normal);
+        var light_dir = normalize(l_position - in.world_position);
+
+        var diffuse_strength = max(dot(normal, light_dir), 0.0);
+        var diffuse_color = diffuse_strength * in_light * l_color;
+
+        var view_dir = normalize(camera.view_pos.xyz - in.world_position);
+        var half_dir = normalize(view_dir + light_dir);
+
+        var specular_strength = pow(max(dot(normal, half_dir), 0.0), 32.0);
+        var specular_color = specular_strength * in_light * l_color;
+        
+        var lig = l_intensity * (ambient_color + diffuse_color + specular_color) * object_color.xyz;
+
+        result = result + lig;
+    }
+    
     var final_result = vec4<f32>(result, object_color.a);
 
     return final_result;

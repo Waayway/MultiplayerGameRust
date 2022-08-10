@@ -31,6 +31,7 @@ pub struct LightRaw {
 
 pub struct LightBuffer {
     pub buffer: wgpu::Buffer,
+    pub light_num_buffer: wgpu::Buffer,
 }
 
 
@@ -69,6 +70,7 @@ impl Light {
         }
     }
 }
+
 impl LightBuffer {
     pub fn new(device: &wgpu::Device, lights: &Vec<Light>) -> Self{
         let light_raws = lights.iter().map(|light| light.to_raw()).collect::<Vec<_>>();
@@ -76,9 +78,19 @@ impl LightBuffer {
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Instance Buffer"),
                 contents: bytemuck::cast_slice(&light_raws),
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            }
+        );
+        let light_num_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Instance Buffer"),
+                contents: &[light_raws.len() as u8],
                 usage: wgpu::BufferUsages::UNIFORM,
             }
         );
-        Self { buffer: light_buffer }
+        Self { 
+            buffer: light_buffer,
+            light_num_buffer: light_num_buffer,
+        }
     }
 }
