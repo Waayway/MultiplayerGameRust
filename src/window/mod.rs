@@ -8,6 +8,7 @@ pub mod resources;
 pub mod light;
 pub mod render_pipeline;
 pub mod ui;
+pub mod shadow;
 
 
 // winit Imports
@@ -325,7 +326,9 @@ impl State {
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
-        self.camera_controller.process_event(event)
+        if self.camera_controller.process_event(event) {return true}
+        
+        false
     }
 
     fn update(&mut self) {

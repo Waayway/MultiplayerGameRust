@@ -93,6 +93,11 @@ struct MaterialUniform {
 @group(0) @binding(4)
 var<uniform> materialUniform: MaterialUniform;
 
+struct Ray {
+    origin: vec3<f32>,
+    dir: vec3<f32>,
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var object_color: vec4<f32> = vec4(0.0,0.0,0.0,0.0);
