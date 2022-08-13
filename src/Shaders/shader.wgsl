@@ -104,6 +104,16 @@ var t_shadow: texture_depth_2d_array;
 @binding(1)
 var sampler_shadow: sampler_comparison;
 
+@group(4) @binding(0)
+var<uniform> render_target: i32;
+
+@group(4) @binding(1)
+var t_depth: texture_depth_2d;
+@group(4) @binding(2)
+var s_depth: sampler;
+@group(4) @binding(3)
+var shadow_view: texture_depth_2d_array;
+
 fn fetch_shadow(light_id: u32, homogeneous_coords: vec4<f32>) -> f32 {
     if (homogeneous_coords.w <= 0.0) {
         return 1.0;
@@ -175,6 +185,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         var lig = l_intensity * (ambient_color + diffuse_color + specular_color) * shadow * object_color.xyz;
 
         result = result + lig;
+    }
+    if (render_target == 1) {
+        result = textureSample(t_depth, s_depth, in.tex_coords);
     }
     
     var final_result = vec4<f32>(result, object_color.a);

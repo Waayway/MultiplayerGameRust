@@ -9,9 +9,9 @@ use winit::{
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub enum RenderTarget {
-    Default,
-    DepthTexture,
-    ShadowTexture,
+    Default = 0,
+    DepthTexture = 1,
+    ShadowTexture = 2,
 }
 
 
@@ -131,6 +131,7 @@ impl UI {
 
         queue.submit(Some(encoder.finish()));
     }
+
     pub fn handle_input<T>(&mut self, window: &Window, event: &Event<T>) -> bool{
         self.imgui_platform.handle_event(self.imgui.io_mut(), window, event);
         return true;

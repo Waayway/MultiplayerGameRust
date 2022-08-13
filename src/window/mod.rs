@@ -11,6 +11,7 @@ pub mod ui;
 pub mod shadow;
 
 
+use wgpu::util::DeviceExt;
 // winit Imports
 use winit::{
     event::*,
@@ -63,6 +64,10 @@ struct State {
 
     // Shadow Stuff
     shadow_config: shadow::Shadow,
+
+    // Render Overlay stuff
+    render_texture_bind_group: wgpu::BindGroup,
+    render_target_buffer: wgpu::Buffer,
 }
 
 
@@ -92,7 +97,10 @@ impl State {
                 limits: if cfg!(target_arch = "wasm32") {
                     wgpu::Limits::downlevel_webgl2_defaults()
                 } else {
-                    wgpu::Limits::default()
+                    wgpu::Limits {
+                        max_bind_groups: 8,
+                        ..Default::default()
+                    }
                 },
                 label: None,
             },
@@ -158,7 +166,7 @@ impl State {
                     },
                     count: None,
                 }],
-                label: None,
+                label: Some("Light Bind group layout"),
             });
 
         let light_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -235,6 +243,47 @@ impl State {
                 label: Some("texture_bind_group_layout"),
         });
         
+        let render_textures_bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Depth and Shadow Texture BindGroup"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry { // Standard Depth Texture
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry { // Standard Depth Sampler
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry { // Standard Shadow Texture
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2Array,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                }
+            ],
+        });
 
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
@@ -242,7 +291,8 @@ impl State {
                 &texture_bind_group_layout,
                 &camera_bind_group_layout,
                 &light_bind_group_layout,
-                &shadow_config.ext_bind_group_layout
+                &shadow_config.ext_bind_group_layout,
+                &render_textures_bind_layout,
             ],
             push_constant_ranges: &[],
         });
@@ -304,7 +354,34 @@ impl State {
 
         let instance_buffer = instances::InstanceBuffer::new(&device, &instance_vec);
 
-        
+        let render_target_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Render target num"),
+            contents: bytemuck::cast_slice(&[ui.render_target as i32]),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+
+        let render_textures_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Render texture Bind group"),
+            layout: &render_textures_bind_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(render_target_buffer.as_entire_buffer_binding())
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&depth_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&depth_texture.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&shadow_config.shadow_view),
+                }
+            ]
+        });
 
         Self {
             surface,
@@ -328,7 +405,9 @@ impl State {
             light_buffer,
             light_bind_group,
             light_render_pipeline,
-            shadow_config
+            shadow_config,
+            render_texture_bind_group: render_textures_bind_group,
+            render_target_buffer
         }
     }
 
@@ -353,6 +432,7 @@ impl State {
         self.camera_controller.update_camera(&mut self.camera);
         self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
+        self.queue.write_buffer(&self.render_target_buffer, 0, bytemuck::cast_slice(&[self.ui.render_target as i32]));
         // let old_position: cgmath::Vector3<_> = self.light_uniform.position.into();
         // self.light_uniform.position = (cgmath::Quaternion::from_axis_angle((0.0, 1.0, 0.0).into(), cgmath::Deg(1.0)) * old_position).into();
         // self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
@@ -399,6 +479,7 @@ impl State {
             use model::DrawModel;
             render_pass.set_pipeline(&&self.render_pipeline);
             render_pass.set_bind_group(3, &self.shadow_config.ext_bind_group, &[]);
+            render_pass.set_bind_group(4, &self.render_texture_bind_group, &[]);
             render_pass.draw_model_instanced(&self.obj_model, 0..self.instances.len() as u32, &self.camera_bind_group, &self.light_bind_group);
             
         }
