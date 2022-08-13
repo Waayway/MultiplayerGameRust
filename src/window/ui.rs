@@ -6,12 +6,23 @@ use winit::{
 };
 
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub enum RenderTarget {
+    Default,
+    DepthTexture,
+    ShadowTexture,
+}
+
+
 pub struct UI {
     imgui: imgui::Context,
     imgui_platform: imgui_winit_support::WinitPlatform,
     renderer: Renderer,
     last_frame: Instant,
     last_cursor: Option<imgui::MouseCursor>,
+    pub render_target: RenderTarget,
+    render_target_int: u32,
 }
 
 impl UI {
@@ -53,6 +64,8 @@ impl UI {
             renderer,
             last_frame,
             last_cursor,
+            render_target: RenderTarget::Default,
+            render_target_int: 0,
         }
     }
     pub fn draw(&mut self, window: &Window ,device: &wgpu::Device, queue: &wgpu::Queue, surface_view: &wgpu::TextureView) {
@@ -66,14 +79,26 @@ impl UI {
         {
             let window = imgui::Window::new("Information");
             window
-                .size([300.0, 100.0], imgui::Condition::FirstUseEver)
-                .position([0.0; 2], imgui::Condition::Always)
+                .size([300.0, 300.0], imgui::Condition::FirstUseEver)
+                .position([0.0; 2], imgui::Condition::FirstUseEver)
                 .build(&ui, || {
                     let mouse_pos = ui.io().mouse_pos;
                     let fps = (1000.0 / delta_s.as_millis() as f32).round() as i32;
                     ui.text(format!("Mouse Position: ({:.1},{:.1})", mouse_pos[0], mouse_pos[1]));
                     ui.text(format!("FPS: {:?}", fps));
                     ui.text(format!("Frametime: {:?}", delta_s));
+                    let mut clicked = false;
+                    clicked |= ui.radio_button("Standard View", &mut self.render_target_int, 0);
+                    clicked |= ui.radio_button("Depth Texture", &mut self.render_target_int, 1);
+                    clicked |= ui.radio_button("Shadow Texture", &mut self.render_target_int, 2);
+                    if clicked {
+                        match self.render_target_int {
+                            0 => {self.render_target = RenderTarget::Default},
+                            1 => {self.render_target = RenderTarget::DepthTexture},
+                            2 => {self.render_target = RenderTarget::ShadowTexture},
+                            _ => {},
+                        }
+                    }
                 });
         }
 

@@ -60,6 +60,9 @@ struct State {
     light_buffer: light::LightBuffer,
     light_bind_group: wgpu::BindGroup,
     light_render_pipeline: wgpu::RenderPipeline,
+
+    // Shadow Stuff
+    shadow_config: shadow::Shadow,
 }
 
 
@@ -126,8 +129,10 @@ impl State {
         let camera_controller = camera::CameraController::new(0.2);
 
         let light0 = light::Light::new(0, [2.0, 2.0, 2.0].into(), [1.0, 1.0, 1.0].into(), 1.0, 1.0);
+
+        let lights_vec = vec![light0];
         
-        let light_buffer = light::LightBuffer::new(&device, &vec![light0]);
+        let light_buffer = light::LightBuffer::new(&device, &lights_vec);
 
         let light_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -168,10 +173,21 @@ impl State {
             }],
             label: None,
         });
+
+        let depth_texture = texture::Texture::create_depth_texture(&device, &config, "depth_texture");
+
+        let shadow_config = {
+            let shader = wgpu::ShaderModuleDescriptor {
+                label: Some("Shadow Shader"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("../Shaders/shadow.wgsl").into()),
+            };
+            let shader = device.create_shader_module(shader);
+            shadow::Shadow::new(&device, &shader, lights_vec, &[model::ModelVertex::desc(), instances::InstanceRaw::desc()], &camera_bind_group_layout, 512, 512)
+        };
         
         let texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
-                    wgpu::BindGroupLayoutEntry {
+                    wgpu::BindGroupLayoutEntry { // Standard diffuse Texture
                         binding: 0,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
@@ -181,7 +197,7 @@ impl State {
                         },
                         count: None,
                     },
-                    wgpu::BindGroupLayoutEntry {
+                    wgpu::BindGroupLayoutEntry { // Standard Diffuse Sampler
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         // This should match the filterable field of the
@@ -189,7 +205,7 @@ impl State {
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
-                    wgpu::BindGroupLayoutEntry {
+                    wgpu::BindGroupLayoutEntry { // Standard Normal texture
                         binding: 2,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
@@ -199,13 +215,13 @@ impl State {
                         },
                         count: None,
                     },
-                    wgpu::BindGroupLayoutEntry {
+                    wgpu::BindGroupLayoutEntry { // standard Normal Sampler
                         binding: 3,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
-                    wgpu::BindGroupLayoutEntry {
+                    wgpu::BindGroupLayoutEntry { // MaterialUniform
                         binding: 4,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Buffer {
@@ -214,12 +230,11 @@ impl State {
                             min_binding_size: None,
                         },
                         count: None,
-                    }
+                    }                    
                 ],
                 label: Some("texture_bind_group_layout"),
         });
-        let depth_texture = texture::Texture::create_depth_texture(&device, &config, "depth_texture");
-
+        
 
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
@@ -227,10 +242,12 @@ impl State {
                 &texture_bind_group_layout,
                 &camera_bind_group_layout,
                 &light_bind_group_layout,
+                &shadow_config.ext_bind_group_layout
             ],
             push_constant_ranges: &[],
         });
 
+        
         let render_pipeline = {
             let shader = wgpu::ShaderModuleDescriptor {
                 label: Some("Normal Shader"),
@@ -266,13 +283,6 @@ impl State {
             )
         };
 
-        let instance_vec = vec![instances::Instance {
-            position: cgmath::Vector3::new(0.0,0.0,0.0),
-            rotation: cgmath::Quaternion::new(0.0,0.0,0.0,0.0),
-        }];
-
-        let instance_buffer = instances::InstanceBuffer::new(&device, &instance_vec);
-
         let obj_model = resources::load_model(
             "Models1/test.obj",
             &device,
@@ -287,7 +297,14 @@ impl State {
             &texture_bind_group_layout,
         ).await.unwrap();    
 
-                
+        let instance_vec = vec![instances::Instance {
+            position: cgmath::Vector3::new(0.0,0.0,0.0),
+            rotation: cgmath::Quaternion::new(0.0,0.0,0.0,0.0),
+        }];
+
+        let instance_buffer = instances::InstanceBuffer::new(&device, &instance_vec);
+
+        
 
         Self {
             surface,
@@ -310,7 +327,8 @@ impl State {
             light0,
             light_buffer,
             light_bind_group,
-            light_render_pipeline
+            light_render_pipeline,
+            shadow_config
         }
     }
 
@@ -346,7 +364,9 @@ impl State {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
-        {
+        self.shadow_config.render(&mut encoder, &self.light_buffer.buffer, &self.instance_buffer, &self.instances, &self.obj_model, &self.camera_bind_group);
+        {   
+             
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -378,6 +398,7 @@ impl State {
             
             use model::DrawModel;
             render_pass.set_pipeline(&&self.render_pipeline);
+            render_pass.set_bind_group(3, &self.shadow_config.ext_bind_group, &[]);
             render_pass.draw_model_instanced(&self.obj_model, 0..self.instances.len() as u32, &self.camera_bind_group, &self.light_bind_group);
             
         }

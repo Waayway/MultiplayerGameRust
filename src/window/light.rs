@@ -1,3 +1,5 @@
+use std::f32::consts;
+
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -26,7 +28,8 @@ pub struct LightRaw {
     pub limitcos_inner: f32,
     pub limitcos_outer: f32,
     pub limitdir: [f32; 3],
-    pub _padding2: u32,
+    pub proj: [[f32; 4];4],
+    pub _padding1: u32
 }
 
 pub struct LightBuffer {
@@ -56,6 +59,15 @@ impl Light {
         }
     }
     pub fn to_raw(&self) -> LightRaw {
+        let pos = cgmath::point3(self.position.x, self.position.y, self.position.z);
+        let view = cgmath::Matrix4::look_at_rh(pos, cgmath::Point3 { x: 0.0, y: 0.0, z: 0.0 }, cgmath::Vector3::new(0.0, 0.0, 0.0));
+        let projection = cgmath::perspective(
+            cgmath::Deg(120.0),
+            1.0, 
+            1.0, 
+            20.0
+        );
+        let view_proj = projection * view;
         LightRaw {
             position: self.position.into(),
             _padding: 0,
@@ -66,7 +78,8 @@ impl Light {
             limitcos_inner: self.limitcos_inner,
             limitcos_outer: self.limitcos_outer,
             limitdir: self.limitdir.into(),
-            _padding2: 0,
+            proj: view_proj.into(),
+            _padding1: 0
         }
     }
 }
@@ -78,7 +91,7 @@ impl LightBuffer {
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Instance Buffer"),
                 contents: bytemuck::cast_slice(&light_raws),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
             }
         );
         let light_num_buffer = device.create_buffer_init(

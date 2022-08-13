@@ -16,6 +16,7 @@ struct Light {
     limitcos_inner: f32,
     limitcos_outer: f32,
     limitdir: vec3<f32>,
+    proj: mat4x4<f32>,
 }
 @group(2) @binding(0)
 var<storage> lights: array<Light>;
@@ -28,6 +29,7 @@ struct VertexInput {
     @location(1) tex_coords: vec2<f32>,
     @location(2) normal: vec3<f32>,
 }
+
 struct InstanceInput {
     @location(5) model_matrix_0: vec4<f32>,
     @location(6) model_matrix_1: vec4<f32>,
@@ -43,6 +45,7 @@ struct VertexOutput {
     @location(0) tex_coords: vec2<f32>,
     @location(1) world_normal: vec3<f32>,
     @location(2) world_position: vec3<f32>,
+    @location(3) full_world_pos: vec4<f32>,
 }
 
 @vertex
@@ -66,6 +69,7 @@ fn vs_main(
     out.world_normal = normal_matrix * model.normal;
     var world_position: vec4<f32> = model_matrix * vec4<f32>(model.position, 1.0);
     out.world_position = world_position.xyz;
+    out.full_world_pos = world_position;
     out.clip_position = camera.view_proj * world_position;
     return out;
 }
@@ -92,6 +96,27 @@ struct MaterialUniform {
 
 @group(0) @binding(4)
 var<uniform> materialUniform: MaterialUniform;
+
+@group(3)
+@binding(0)
+var t_shadow: texture_depth_2d_array;
+@group(3)
+@binding(1)
+var sampler_shadow: sampler_comparison;
+
+fn fetch_shadow(light_id: u32, homogeneous_coords: vec4<f32>) -> f32 {
+    if (homogeneous_coords.w <= 0.0) {
+        return 1.0;
+    }
+    // compensate for the Y-flip difference between the NDC and texture coordinates
+    let flip_correction = vec2<f32>(0.5, -0.5);
+    // compute texture coordinates for shadow lookup
+    let proj_correction = 1.0 / homogeneous_coords.w;
+    let light_local = homogeneous_coords.xy * flip_correction * proj_correction + vec2<f32>(0.5, 0.5);
+    // do the lookup, using HW PCF and comparison
+    return textureSampleCompareLevel(t_shadow, sampler_shadow, light_local, i32(light_id), homogeneous_coords.z * proj_correction);
+}
+
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
@@ -133,6 +158,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         var ambient_color = l_color * l_radius / max(l_radius, distance(l_position, in.world_position));
         ambient_color = ambient_color * in_light;
         
+        var shadow = fetch_shadow(u32(i), lights[i].proj * in.full_world_pos);
+
         var normal = normalize(in.world_normal);
         var light_dir = normalize(l_position - in.world_position);
 
@@ -145,7 +172,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         var specular_strength = pow(max(dot(normal, half_dir), 0.0), 32.0);
         var specular_color = specular_strength * in_light * l_color;
         
-        var lig = l_intensity * (ambient_color + diffuse_color + specular_color) * object_color.xyz;
+        var lig = l_intensity * (ambient_color + diffuse_color + specular_color) * shadow * object_color.xyz;
 
         result = result + lig;
     }
