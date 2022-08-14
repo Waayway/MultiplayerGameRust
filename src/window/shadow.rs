@@ -105,7 +105,7 @@ impl Shadow {
         });
 
         let shadow_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("shadow"),
+            label: Some("Shadow Sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -119,7 +119,7 @@ impl Shadow {
         let shadow_size = wgpu::Extent3d {
             width: shadow_width,
             height: shadow_height,
-            depth_or_array_layers: lights.len() as u32,
+            depth_or_array_layers: (lights.len() + 10) as u32,
         };
 
         let shadow_texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -187,7 +187,6 @@ impl Shadow {
                 }))
             })
             .collect::<Vec<_>>();
-
         Self { 
             bind_group: bind_group, 
             render_pipeline: pipeline, 

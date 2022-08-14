@@ -110,7 +110,7 @@ var<uniform> render_target: i32;
 @group(4) @binding(1)
 var t_depth: texture_depth_2d;
 @group(4) @binding(2)
-var s_depth: sampler;
+var s_depth: sampler_comparison;
 @group(4) @binding(3)
 var shadow_view: texture_depth_2d_array;
 
@@ -186,11 +186,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
         result = result + lig;
     }
+    var final_result = vec4<f32>(result, object_color.a);
+    
     if (render_target == 1) {
-        result = textureSample(t_depth, s_depth, in.tex_coords);
+        final_result = vec4(textureSampleCompare(t_depth, s_depth, in.tex_coords, 0.0));
+    } else if (render_target == 2) {
+        final_result = vec4(fetch_shadow(u32(0), lights[0].proj * in.full_world_pos));
     }
     
-    var final_result = vec4<f32>(result, object_color.a);
-
     return final_result;
 }

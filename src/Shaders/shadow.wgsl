@@ -39,5 +39,5 @@ fn vs_bake(
         instance.model_matrix_2,
         instance.model_matrix_3,
     );
-    return globals.view_proj * model_matrix * vec4<f32>(model.tex_coords, 1.0, 1.0);
+    return camera.view_proj * model_matrix * vec4<f32>(model.position, 1.0);
 }

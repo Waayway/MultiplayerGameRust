@@ -262,7 +262,7 @@ impl State {
                     ty: wgpu::BindingType::Texture {
                         multisampled: false,
                         view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        sample_type: wgpu::TextureSampleType::Depth,
                     },
                     count: None,
                 },
@@ -357,7 +357,7 @@ impl State {
         let render_target_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Render target num"),
             contents: bytemuck::cast_slice(&[ui.render_target as i32]),
-            usage: wgpu::BufferUsages::UNIFORM,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
         let render_textures_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
