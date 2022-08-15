@@ -23,7 +23,9 @@ pub struct InstanceBuffer {
 impl Instance {
     pub fn to_raw(&self) -> InstanceRaw {
         InstanceRaw {
-            model: (cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation)).into(),
+            model: (cgmath::Matrix4::from_translation(self.position)
+                * cgmath::Matrix4::from(self.rotation))
+            .into(),
             normal: cgmath::Matrix3::from(self.rotation).into(),
         }
     }
@@ -85,15 +87,18 @@ impl model::Vertex for InstanceRaw {
 }
 
 impl InstanceBuffer {
-    pub fn new(device: &wgpu::Device, instances: &Vec<Instance>) -> Self{
-        let instance_raws = instances.iter().map(|instance| instance.to_raw()).collect::<Vec<_>>();
-        let instance_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Instance Buffer"),
-                contents: bytemuck::cast_slice(&instance_raws),
-                usage: wgpu::BufferUsages::VERTEX,
-            }
-        );
-        Self { buffer: instance_buffer }
+    pub fn new(device: &wgpu::Device, instances: &Vec<Instance>) -> Self {
+        let instance_raws = instances
+            .iter()
+            .map(|instance| instance.to_raw())
+            .collect::<Vec<_>>();
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Instance Buffer"),
+            contents: bytemuck::cast_slice(&instance_raws),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        Self {
+            buffer: instance_buffer,
+        }
     }
 }

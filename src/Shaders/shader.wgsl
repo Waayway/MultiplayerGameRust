@@ -182,16 +182,20 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         var specular_strength = pow(max(dot(normal, half_dir), 0.0), 32.0);
         var specular_color = specular_strength * in_light * l_color;
         
-        var lig = l_intensity * (ambient_color + diffuse_color + specular_color) * shadow * object_color.xyz;
-
-        result = result + lig;
+        var lig = l_intensity * (ambient_color + diffuse_color + specular_color) * object_color.xyz;
+        if (render_target == 3) {
+            result = result + lig;
+        } else {
+            result = result + lig * shadow;
+        }
+        
     }
     var final_result = vec4<f32>(result, object_color.a);
     
     if (render_target == 1) {
         final_result = vec4(textureSampleCompare(t_depth, s_depth, in.tex_coords, 0.0));
     } else if (render_target == 2) {
-        final_result = vec4(fetch_shadow(u32(0), lights[0].proj * in.full_world_pos));
+        final_result = vec4(0.0,0.0,0.0,0.0);
     }
     
     return final_result;

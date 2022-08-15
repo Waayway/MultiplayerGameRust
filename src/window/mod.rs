@@ -61,6 +61,7 @@ struct State {
     light_buffer: light::LightBuffer,
     light_bind_group: wgpu::BindGroup,
     light_render_pipeline: wgpu::RenderPipeline,
+    lights_are_dirty: bool,
 
     // Shadow Stuff
     shadow_config: shadow::Shadow,
@@ -405,6 +406,7 @@ impl State {
             light_buffer,
             light_bind_group,
             light_render_pipeline,
+            lights_are_dirty: true,
             shadow_config,
             render_texture_bind_group: render_textures_bind_group,
             render_target_buffer
@@ -439,6 +441,11 @@ impl State {
     }
 
     fn render(&mut self, window: &Window) -> Result<(), wgpu::SurfaceError> {
+        if self.lights_are_dirty {
+            self.lights_are_dirty = false;
+            self.light_buffer.repopulate_lights(&self.queue, &vec![self.light0])
+        }
+        
         let output = self.surface.get_current_texture()?;
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {

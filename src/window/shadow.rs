@@ -177,16 +177,17 @@ impl Shadow {
             .map(|i| {
                 Some(shadow_texture.create_view(&wgpu::TextureViewDescriptor {
                     label: Some("Shadow Views"),
-                    format: None,
                     dimension: Some(wgpu::TextureViewDimension::D2),
                     aspect: wgpu::TextureAspect::All,
                     base_mip_level: 0,
                     mip_level_count: None,
                     base_array_layer: i as u32,
                     array_layer_count: NonZeroU32::new(1),
+                    ..Default::default()
                 }))
             })
             .collect::<Vec<_>>();
+
         Self { 
             bind_group: bind_group, 
             render_pipeline: pipeline, 
@@ -209,7 +210,7 @@ impl Shadow {
     ) -> bool {
         encoder.push_debug_group("shadow passes");
         for (i, light) in self.lights.iter().enumerate() {
-            let light_target_view = self.light_target_views[i].as_ref().unwrap();
+            let light_target_view = &self.light_target_views[i].as_ref().unwrap();
             encoder.push_debug_group(&format!(
                 "shadow pass {} (light at position {:?})",
                 i, light.position

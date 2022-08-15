@@ -12,6 +12,7 @@ pub enum RenderTarget {
     Default = 0,
     DepthTexture = 1,
     ShadowTexture = 2,
+    NoShadows = 3,
 }
 
 
@@ -79,7 +80,7 @@ impl UI {
         {
             let window = imgui::Window::new("Information");
             window
-                .size([300.0, 300.0], imgui::Condition::FirstUseEver)
+                .size([300.0, 200.0], imgui::Condition::FirstUseEver)
                 .position([0.0; 2], imgui::Condition::FirstUseEver)
                 .build(&ui, || {
                     let mouse_pos = ui.io().mouse_pos;
@@ -91,11 +92,13 @@ impl UI {
                     clicked |= ui.radio_button("Standard View", &mut self.render_target_int, 0);
                     clicked |= ui.radio_button("Depth Texture", &mut self.render_target_int, 1);
                     clicked |= ui.radio_button("Shadow Texture", &mut self.render_target_int, 2);
+                    clicked |= ui.radio_button("No Shadows", &mut self.render_target_int, 3);
                     if clicked {
                         match self.render_target_int {
                             0 => {self.render_target = RenderTarget::Default},
                             1 => {self.render_target = RenderTarget::DepthTexture},
                             2 => {self.render_target = RenderTarget::ShadowTexture},
+                            3 => {self.render_target = RenderTarget::NoShadows},
                             _ => {},
                         }
                     }

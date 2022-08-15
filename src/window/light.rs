@@ -1,4 +1,4 @@
-use std::f32::consts;
+use std::mem;
 
 use wgpu::util::DeviceExt;
 
@@ -28,15 +28,14 @@ pub struct LightRaw {
     pub limitcos_inner: f32,
     pub limitcos_outer: f32,
     pub limitdir: [f32; 3],
-    pub proj: [[f32; 4];4],
-    pub _padding1: u32
+    pub proj: [[f32; 4]; 4],
+    pub _padding1: u32,
 }
 
 pub struct LightBuffer {
     pub buffer: wgpu::Buffer,
     pub light_num_buffer: wgpu::Buffer,
 }
-
 
 impl Light {
     pub fn new(
@@ -60,13 +59,16 @@ impl Light {
     }
     pub fn to_raw(&self) -> LightRaw {
         let pos = cgmath::point3(self.position.x, self.position.y, self.position.z);
-        let view = cgmath::Matrix4::look_at_rh(pos, cgmath::Point3 { x: 0.0, y: 0.0, z: 0.0 }, cgmath::Vector3::new(0.0, 0.0, 0.0));
-        let projection = cgmath::perspective(
-            cgmath::Deg(120.0),
-            1.0, 
-            1.0, 
-            20.0
+        let view = cgmath::Matrix4::look_at_rh(
+            pos,
+            cgmath::Point3 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            cgmath::Vector3::new(0.0, 0.0, 0.0),
         );
+        let projection = cgmath::perspective(cgmath::Deg(120.0), 1.0, 1.0, 20.0);
         let view_proj = projection * view;
         LightRaw {
             position: self.position.into(),
@@ -79,31 +81,41 @@ impl Light {
             limitcos_outer: self.limitcos_outer,
             limitdir: self.limitdir.into(),
             proj: view_proj.into(),
-            _padding1: 0
+            _padding1: 0,
         }
     }
 }
 
 impl LightBuffer {
-    pub fn new(device: &wgpu::Device, lights: &Vec<Light>) -> Self{
-        let light_raws = lights.iter().map(|light| light.to_raw()).collect::<Vec<_>>();
-        let light_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Instance Buffer"),
-                contents: bytemuck::cast_slice(&light_raws),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
-            }
-        );
-        let light_num_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Instance Buffer"),
-                contents: &[light_raws.len() as u8],
-                usage: wgpu::BufferUsages::UNIFORM,
-            }
-        );
-        Self { 
+    pub fn new(device: &wgpu::Device, lights: &Vec<Light>) -> Self {
+        let light_raws = lights
+            .iter()
+            .map(|light| light.to_raw())
+            .collect::<Vec<_>>();
+        let light_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Light Buffer"),
+            contents: bytemuck::cast_slice(&light_raws),
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
+        });
+        let light_num_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Instance Buffer"),
+            contents: &[light_raws.len() as u8],
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+        Self {
             buffer: light_buffer,
             light_num_buffer: light_num_buffer,
+        }
+    }
+    pub fn repopulate_lights(&mut self, queue: &wgpu::Queue, lights: &Vec<Light>) {
+        for (i, light) in lights.iter().enumerate() {
+            queue.write_buffer(
+                &self.buffer,
+                (i * mem::size_of::<LightRaw>()) as wgpu::BufferAddress,
+                bytemuck::bytes_of(&light.to_raw()),
+            );
         }
     }
 }
