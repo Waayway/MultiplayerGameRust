@@ -195,7 +195,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if (render_target == 1) {
         final_result = vec4(textureSampleCompare(t_depth, s_depth, in.tex_coords, 0.0));
     } else if (render_target == 2) {
-        final_result = vec4(0.0,0.0,0.0,0.0);
+        final_result = vec4(fetch_shadow(u32(0), lights[0].proj * in.full_world_pos));
     }
     
     return final_result;

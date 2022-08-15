@@ -131,10 +131,7 @@ impl Shadow {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             label: None,
         });
-        let shadow_view = shadow_texture.create_view(&wgpu::TextureViewDescriptor {
-            dimension: Some(wgpu::TextureViewDimension::D2Array),
-            ..Default::default()
-        });
+        let shadow_view = shadow_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let pub_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("External Shadow Bind Group Layout"),
@@ -183,6 +180,7 @@ impl Shadow {
                     mip_level_count: None,
                     base_array_layer: i as u32,
                     array_layer_count: NonZeroU32::new(1),
+                    format: None,
                     ..Default::default()
                 }))
             })
