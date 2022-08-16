@@ -455,7 +455,7 @@ impl State {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
-        self.shadow_config.render(&mut encoder, &self.light_buffer.buffer, &self.instance_buffer, &self.instances, &self.obj_model, &self.camera_bind_group);
+        self.shadow_config.render(&mut encoder, &self.instance_buffer, &self.instances, &self.obj_model, &self.camera_bind_group, &self.queue);
         {   
              
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

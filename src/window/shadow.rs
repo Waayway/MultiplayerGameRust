@@ -94,11 +94,7 @@ impl Shadow {
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::LessEqual,
                 stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState {
-                    constant: 2, // corresponds to bilinear filtering
-                    slope_scale: 2.0,
-                    clamp: 0.0,
-                },
+                bias: wgpu::DepthBiasState::default(),
             }),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
@@ -181,7 +177,6 @@ impl Shadow {
                     base_array_layer: i as u32,
                     array_layer_count: NonZeroU32::new(1),
                     format: None,
-                    ..Default::default()
                 }))
             })
             .collect::<Vec<_>>();
@@ -199,12 +194,12 @@ impl Shadow {
     }
     pub fn render(
         &mut self, 
-        encoder: &mut wgpu::CommandEncoder, 
-        light_storage_buf: &wgpu::Buffer,
+        encoder: &mut wgpu::CommandEncoder,
         instance_buf: &instances::InstanceBuffer,
         instances: &Vec<Instance>,
         model: &model::Model,
         camera_bind_group: &wgpu::BindGroup,
+        queue: &wgpu::Queue,
     ) -> bool {
         encoder.push_debug_group("shadow passes");
         for (i, light) in self.lights.iter().enumerate() {
@@ -216,13 +211,10 @@ impl Shadow {
 
             // The light uniform buffer already has the projection,
             // let's just copy it over to the shadow uniform buffer.
-            encoder.copy_buffer_to_buffer(
-                light_storage_buf,
-                (i * mem::size_of::<light::LightRaw>()) as wgpu::BufferAddress,
-                &self.uniform_buf,
-                0,
-                64,
-            );
+            queue.write_buffer(&self.uniform_buf, 0, bytemuck::cast_slice(&[GlobalUniforms {
+                proj: light.to_raw().proj,
+                num_lights: [0; 4],
+            }]));
 
             encoder.insert_debug_marker("render entities");
             {

@@ -8,6 +8,7 @@ struct Camera {
 var<uniform> camera: Camera;
 
 struct Light {
+    proj: mat4x4<f32>,
     position: vec3<f32>,
     color: vec3<f32>,
     intensity: f32,
@@ -16,7 +17,6 @@ struct Light {
     limitcos_inner: f32,
     limitcos_outer: f32,
     limitdir: vec3<f32>,
-    proj: mat4x4<f32>,
 }
 @group(2) @binding(0)
 var<storage> lights: array<Light>;
