@@ -165,10 +165,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
         l_radius = max(l_radius, 0.00001);
         
-        var ambient_color = l_color * l_radius / max(l_radius, distance(l_position, in.world_position));
-        ambient_color = ambient_color * in_light;
-        
         var shadow = fetch_shadow(u32(i), lights[i].proj * in.full_world_pos);
+
+        var ambient_color = l_color * l_radius / max(l_radius, distance(l_position, in.world_position));
+        ambient_color = ambient_color * in_light * shadow;
+        
 
         var normal = normalize(in.world_normal);
         var light_dir = normalize(l_position - in.world_position);
