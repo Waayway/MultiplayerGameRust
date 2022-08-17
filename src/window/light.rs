@@ -2,6 +2,8 @@ use std::{mem, f32::consts};
 
 use wgpu::util::DeviceExt;
 
+use super::camera;
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct Light {
@@ -68,14 +70,8 @@ impl Light {
             },
             cgmath::Vector3::new(0.0, 0.0, 0.0),
         );
-        let projection = cgmath::PerspectiveFov{
-            fovy: cgmath::Rad(120. * consts::PI / 180.), 
-            aspect: 1.0, 
-            near: 0.1, 
-            far: 20.0
-        };
-        let projection = cgmath::perspective(projection.fovy, projection.aspect, projection.near, projection.far);
-        let view_proj = projection * view;
+        let projection = cgmath::perspective(cgmath::Deg(120.), 1.0, 1.0, 20.0);
+        let view_proj = camera::OPENGL_TO_WGPU_MATRIX * projection * view;
         let view_proj: [[f32;4]; 4] = [
             view_proj.x.into(),
             view_proj.y.into(),

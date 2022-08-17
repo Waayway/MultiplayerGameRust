@@ -27,7 +27,6 @@ impl Shadow {
         shader: &wgpu::ShaderModule,
         lights: Vec<light::Light>,
         vertex_layouts: &[wgpu::VertexBufferLayout],
-        camera_bind_group_layout: &wgpu::BindGroupLayout,
         shadow_width: u32,
         shadow_height: u32,
     ) -> Self {
@@ -50,7 +49,6 @@ impl Shadow {
             label: Some("Shadow Pipeline Layout"),
             bind_group_layouts: &[
                 &bind_group_layout,
-                camera_bind_group_layout,
             ],
             push_constant_ranges: &[],
         });
@@ -87,6 +85,7 @@ impl Shadow {
                 unclipped_depth: device
                     .features()
                     .contains(wgpu::Features::DEPTH_CLIP_CONTROL),
+                polygon_mode: wgpu::PolygonMode::Fill,
                 ..Default::default()
             },
             depth_stencil: Some(wgpu::DepthStencilState {
@@ -198,7 +197,6 @@ impl Shadow {
         instance_buf: &instances::InstanceBuffer,
         instances: &Vec<Instance>,
         model: &model::Model,
-        camera_bind_group: &wgpu::BindGroup,
         queue: &wgpu::Queue,
     ) -> bool {
         encoder.push_debug_group("shadow passes");
@@ -233,7 +231,6 @@ impl Shadow {
                 pass.set_pipeline(&self.render_pipeline);
                 pass.set_vertex_buffer(1, instance_buf.buffer.slice(..));
                 pass.set_bind_group(0, &self.bind_group, &[]);
-                pass.set_bind_group(1, camera_bind_group, &[]);
 
                 for mesh in &model.meshes {
                     pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);

@@ -195,7 +195,7 @@ impl State {
                 source: wgpu::ShaderSource::Wgsl(include_str!("../Shaders/shadow.wgsl").into()),
             };
             let shader = device.create_shader_module(shader);
-            shadow::Shadow::new(&device, &shader, lights_vec, &[model::ModelVertex::desc(), instances::InstanceRaw::desc()], &camera_bind_group_layout, 512, 512)
+            shadow::Shadow::new(&device, &shader, lights_vec, &[model::ModelVertex::desc(), instances::InstanceRaw::desc()], 1024, 1024)
         };
         
         let texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -455,7 +455,7 @@ impl State {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
-        self.shadow_config.render(&mut encoder, &self.instance_buffer, &self.instances, &self.obj_model, &self.camera_bind_group, &self.queue);
+        self.shadow_config.render(&mut encoder, &self.instance_buffer, &self.instances, &self.obj_model, &self.queue);
         {   
              
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
