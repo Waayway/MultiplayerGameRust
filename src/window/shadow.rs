@@ -114,7 +114,7 @@ impl Shadow {
         let shadow_size = wgpu::Extent3d {
             width: shadow_width,
             height: shadow_height,
-            depth_or_array_layers: (lights.len() + 10) as u32,
+            depth_or_array_layers: (lights.len() + 1) as u32,
         };
 
         let shadow_texture = device.create_texture(&wgpu::TextureDescriptor {
