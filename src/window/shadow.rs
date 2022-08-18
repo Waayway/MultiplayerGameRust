@@ -93,7 +93,11 @@ impl Shadow {
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::LessEqual,
                 stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
+                bias: wgpu::DepthBiasState {
+                    constant: 2, // corresponds to bilinear filtering
+                    slope_scale: 1.0,
+                    clamp: 0.0,
+                },
             }),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
@@ -233,8 +237,8 @@ impl Shadow {
                 pass.set_bind_group(0, &self.bind_group, &[]);
 
                 for mesh in &model.meshes {
-                    pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                     pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                    pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
                     pass.draw_indexed(0..mesh.num_elements, 0, 0..instances.len() as u32)
                 }
             }

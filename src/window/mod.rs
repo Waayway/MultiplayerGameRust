@@ -11,6 +11,7 @@ pub mod ui;
 pub mod shadow;
 
 
+use cgmath::Rotation3;
 use wgpu::util::DeviceExt;
 // winit Imports
 use winit::{
@@ -195,7 +196,7 @@ impl State {
                 source: wgpu::ShaderSource::Wgsl(include_str!("../Shaders/shadow.wgsl").into()),
             };
             let shader = device.create_shader_module(shader);
-            shadow::Shadow::new(&device, &shader, lights_vec, &[model::ModelVertex::desc(), instances::InstanceRaw::desc()], 1024, 1024)
+            shadow::Shadow::new(&device, &shader, lights_vec, &[model::ModelVertex::desc(), instances::InstanceRaw::desc()], 8192, 8192)
         };
         
         let texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -439,9 +440,9 @@ impl State {
         self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
         self.queue.write_buffer(&self.render_target_buffer, 0, bytemuck::cast_slice(&[self.ui.render_target as i32]));
-        // let old_position: cgmath::Vector3<_> = self.light_uniform.position.into();
-        // self.light_uniform.position = (cgmath::Quaternion::from_axis_angle((0.0, 1.0, 0.0).into(), cgmath::Deg(1.0)) * old_position).into();
-        // self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
+        // let old_position: cgmath::Vector3<_> = self.light0.position.into();
+        // self.light0.position = (cgmath::Quaternion::from_axis_angle((0.0, 1.0, 0.0).into(), cgmath::Deg(1.0)) * old_position).into();
+        // self.light_buffer.repopulate_lights(&self.queue, &vec![self.light0]);
     }
 
     fn render(&mut self, window: &Window) -> Result<(), wgpu::SurfaceError> {

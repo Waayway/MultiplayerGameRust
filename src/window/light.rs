@@ -71,7 +71,7 @@ impl Light {
             cgmath::Vector3::new(0.0, 0.0, 1.0),
         );
         let projection = cgmath::perspective(cgmath::Deg(160.), 1.0, 0.1, 100.0);
-        let view_proj = projection * view;
+        let view_proj = (projection) * view;
         let view_proj: [[f32;4]; 4] = [
             view_proj.x.into(),
             view_proj.y.into(),
