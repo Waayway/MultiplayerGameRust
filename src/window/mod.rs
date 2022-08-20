@@ -10,8 +10,6 @@ pub mod render_pipeline;
 pub mod ui;
 pub mod shadow;
 
-
-use cgmath::Rotation3;
 use wgpu::util::DeviceExt;
 // winit Imports
 use winit::{
@@ -142,7 +140,7 @@ impl State {
 
         let camera_controller = camera::CameraController::new(0.2);
 
-        let light0 = light::Light::new(0, [2.0, 2.0, 2.0].into(), [1.0, 1.0, 1.0].into(), 1.0, 1.0);
+        let light0 = light::Light::new(0, [2.0, 2.1, 2.0].into(), [1.0, 1.0, 1.0].into(), 1.0, 1.0);
 
         let lights_vec = vec![light0];
         
@@ -443,6 +441,7 @@ impl State {
         // let old_position: cgmath::Vector3<_> = self.light0.position.into();
         // self.light0.position = (cgmath::Quaternion::from_axis_angle((0.0, 1.0, 0.0).into(), cgmath::Deg(1.0)) * old_position).into();
         // self.light_buffer.repopulate_lights(&self.queue, &vec![self.light0]);
+        // self.shadow_config.update_lights(vec![self.light0]);
     }
 
     fn render(&mut self, window: &Window) -> Result<(), wgpu::SurfaceError> {

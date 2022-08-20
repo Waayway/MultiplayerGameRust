@@ -248,4 +248,7 @@ impl Shadow {
         encoder.pop_debug_group();
         true
     }
+    pub fn _update_lights(&mut self, lights: Vec<light::Light>) {
+        self.lights = lights;
+    }
 }

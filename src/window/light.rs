@@ -1,8 +1,7 @@
-use std::{mem, f32::consts};
+use std::{mem};
 
 use wgpu::util::DeviceExt;
 
-use super::camera;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -61,16 +60,13 @@ impl Light {
     }
     pub fn to_raw(&self) -> LightRaw {
         let pos = cgmath::point3(self.position.x, self.position.y, self.position.z);
+        let center = cgmath::point3(0.,0.,0.);
         let view = cgmath::Matrix4::look_at_rh(
             pos,
-            cgmath::Point3 {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
+            center,
             cgmath::Vector3::new(0.0, 0.0, 1.0),
         );
-        let projection = cgmath::perspective(cgmath::Deg(160.), 1.0, 0.1, 100.0);
+        let projection = cgmath::perspective(cgmath::Deg(120.), 1.0, 0.1, 100.0);
         let view_proj = (projection) * view;
         let view_proj: [[f32;4]; 4] = [
             view_proj.x.into(),
