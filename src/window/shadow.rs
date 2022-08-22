@@ -17,9 +17,9 @@ pub struct Shadow {
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct GlobalUniforms {
-    proj: [[f32; 4]; 4],
-    num_lights: [u32; 4],
+    projections: [[[f32; 4]; 4]; 6],
 }
+
 
 impl Shadow {
     pub fn new(
@@ -37,7 +37,7 @@ impl Shadow {
                 binding: 0, // global
                 visibility: wgpu::ShaderStages::VERTEX,
                 ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
                     min_binding_size: wgpu::BufferSize::new(uniform_size),
                 },
@@ -56,7 +56,7 @@ impl Shadow {
         let uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
             size: uniform_size,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
@@ -100,7 +100,7 @@ impl Shadow {
                 },
             }),
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview: NonZeroU32::new(6),
         });
 
         let shadow_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -118,7 +118,7 @@ impl Shadow {
         let shadow_size = wgpu::Extent3d {
             width: shadow_width,
             height: shadow_height,
-            depth_or_array_layers: (lights.len() + 1) as u32,
+            depth_or_array_layers: ((lights.len())*6) as u32,
         };
 
         let shadow_texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -128,9 +128,13 @@ impl Shadow {
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Depth32Float,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            label: None,
+            label: Some("Base Shadow Texture"),
         });
-        let shadow_view = shadow_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let shadow_view = shadow_texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some("Shadow Texture View"),
+            dimension: Some(wgpu::TextureViewDimension::CubeArray),
+            ..Default::default()
+        });
 
         let pub_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("External Shadow Bind Group Layout"),
@@ -141,7 +145,7 @@ impl Shadow {
                     ty: wgpu::BindingType::Texture {
                         multisampled: false,
                         sample_type: wgpu::TextureSampleType::Depth,
-                        view_dimension: wgpu::TextureViewDimension::D2Array,
+                        view_dimension: wgpu::TextureViewDimension::CubeArray,
                     },
                     count: None,
                 },
@@ -173,12 +177,12 @@ impl Shadow {
             .map(|i| {
                 Some(shadow_texture.create_view(&wgpu::TextureViewDescriptor {
                     label: Some("Shadow Views"),
-                    dimension: Some(wgpu::TextureViewDimension::D2),
-                    aspect: wgpu::TextureAspect::All,
+                    dimension: Some(wgpu::TextureViewDimension::D2Array),
+                    aspect: wgpu::TextureAspect::DepthOnly,
                     base_mip_level: 0,
                     mip_level_count: None,
                     base_array_layer: i as u32,
-                    array_layer_count: NonZeroU32::new(1),
+                    array_layer_count: NonZeroU32::new(6),
                     format: None,
                 }))
             })
@@ -214,8 +218,7 @@ impl Shadow {
             // The light uniform buffer already has the projection,
             // let's just copy it over to the shadow uniform buffer.
             queue.write_buffer(&self.uniform_buf, 0, bytemuck::cast_slice(&[GlobalUniforms {
-                proj: light.to_raw().proj,
-                num_lights: [0; 4],
+                projections: light.calculate_view_projections(),
             }]));
 
             encoder.insert_debug_marker("render entities");
@@ -232,6 +235,7 @@ impl Shadow {
                         stencil_ops: None,
                     }),
                 });
+
                 pass.set_pipeline(&self.render_pipeline);
                 pass.set_vertex_buffer(1, instance_buf.buffer.slice(..));
                 pass.set_bind_group(0, &self.bind_group, &[]);

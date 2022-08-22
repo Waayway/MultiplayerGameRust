@@ -60,13 +60,13 @@ impl Light {
     }
     pub fn to_raw(&self) -> LightRaw {
         let pos = cgmath::point3(self.position.x, self.position.y, self.position.z);
-        let center = cgmath::point3(0.,0.,0.);
+        let center = cgmath::point3(self.position.x,0.,0.);
         let view = cgmath::Matrix4::look_at_rh(
             pos,
             center,
-            cgmath::Vector3::new(0.0, 0.0, 1.0),
+            cgmath::Vector3::new(0.0, 1.0, 0.0),
         );
-        let projection = cgmath::perspective(cgmath::Deg(120.), 1.0, 0.1, 100.0);
+        let projection = cgmath::perspective(cgmath::Deg(90.), 1.0, 0.1, 100.0);
         let view_proj = (projection) * view;
         let view_proj: [[f32;4]; 4] = [
             view_proj.x.into(),
@@ -87,6 +87,36 @@ impl Light {
             proj: view_proj.into(),
             _padding1: 0,
         }
+    }
+    
+    pub fn calculate_view_projections(&self) -> [[[f32; 4];4];6] {
+        let directions: [cgmath::Point3<f32>; 6] = [
+            [1.0,0.0,0.0].into(),
+            [-1.0,0.0,0.0].into(),
+            [0.0,1.0,0.0].into(),
+            [0.0,-1.0,0.0].into(),
+            [0.0,0.0,1.0].into(),
+            [0.0,0.0,-1.0].into(),
+        ];
+        let mut view_projections: [[[f32; 4];4];6] = [[[0.0; 4]; 4]; 6];
+        for (index, i) in directions.iter().enumerate() {
+            let pos = cgmath::point3(self.position.x, self.position.y, self.position.z);
+            let center = cgmath::point3(self.position.x+i.x,self.position.y+i.y,self.position.z+i.z);
+            let view = cgmath::Matrix4::look_at_rh(
+                pos,
+                center,
+                cgmath::Vector3::new(0.0, 1.0, 0.0),
+            );
+            let projection = cgmath::perspective(cgmath::Deg(90.), 1.0, 0.1, 100.0);
+            let view_proj = (projection) * view;
+            view_projections[index] = [
+                view_proj.x.into(),
+                view_proj.y.into(),
+                view_proj.z.into(),
+                view_proj.w.into(),
+            ];
+        }
+        view_projections
     }
 }
 

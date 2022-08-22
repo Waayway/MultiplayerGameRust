@@ -71,7 +71,8 @@ struct State {
 }
 
 fn features() -> wgpu::Features {
-    wgpu::Features::DEPTH_CLIP_CONTROL
+    wgpu::Features::DEPTH_CLIP_CONTROL |
+    wgpu::Features::MULTIVIEW
 }
 
 
@@ -276,16 +277,6 @@ impl State {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
                     count: None,
                 },
-                wgpu::BindGroupLayoutEntry { // Standard Shadow Texture
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2Array,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                }
             ],
         });
 
@@ -379,10 +370,6 @@ impl State {
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: wgpu::BindingResource::Sampler(&depth_texture.sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::TextureView(&shadow_config.shadow_view),
                 }
             ]
         });

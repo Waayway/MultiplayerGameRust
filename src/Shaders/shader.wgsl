@@ -99,7 +99,7 @@ var<uniform> materialUniform: MaterialUniform;
 
 @group(3)
 @binding(0)
-var t_shadow: texture_depth_2d_array;
+var t_shadow: texture_depth_cube_array;
 @group(3)
 @binding(1)
 var sampler_shadow: sampler_comparison;
@@ -111,20 +111,14 @@ var<uniform> render_target: i32;
 var t_depth: texture_depth_2d;
 @group(4) @binding(2)
 var s_depth: sampler_comparison;
-@group(4) @binding(3)
-var shadow_view: texture_depth_2d_array;
 
 fn fetch_shadow(light_id: u32, homogeneous_coords: vec4<f32>) -> f32 {
     if (homogeneous_coords.w <= 0.0) {
         return 1.0;
     }
     // compensate for the Y-flip difference between the NDC and texture coordinates
-    let flip_correction = vec2<f32>(0.5, -0.5);
-    // compute texture coordinates for shadow lookup
-    let proj_correction = 1.0 / homogeneous_coords.w;
-    let light_local = homogeneous_coords.xy * flip_correction * proj_correction + vec2<f32>(0.5, 0.5);
     // do the lookup, using HW PCF and comparison
-    return textureSampleCompareLevel(t_shadow, sampler_shadow, light_local, i32(light_id), homogeneous_coords.z * proj_correction);
+    return textureSampleCompareLevel(t_shadow, sampler_shadow, homogeneous_coords.xyz, i32(light_id), homogeneous_coords.z * proj_correction);
 }
 
 
