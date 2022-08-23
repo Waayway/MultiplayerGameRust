@@ -90,7 +90,7 @@ impl Light {
     }
     
     pub fn calculate_view_projections(&self) -> [[[f32; 4];4];6] {
-        let directions: [cgmath::Point3<f32>; 6] = [
+        let directions: [cgmath::Vector3<f32>; 6] = [
             [1.0,0.0,0.0].into(),
             [-1.0,0.0,0.0].into(),
             [0.0,1.0,0.0].into(),
@@ -101,21 +101,16 @@ impl Light {
         let mut view_projections: [[[f32; 4];4];6] = [[[0.0; 4]; 4]; 6];
         for (index, i) in directions.iter().enumerate() {
             let pos = cgmath::point3(self.position.x, self.position.y, self.position.z);
-            let center = cgmath::point3(self.position.x+i.x,self.position.y+i.y,self.position.z+i.z);
-            let view = cgmath::Matrix4::look_at_rh(
+            let view = cgmath::Matrix4::look_to_rh(
                 pos,
-                center,
+                *i,
                 cgmath::Vector3::new(0.0, 1.0, 0.0),
             );
             let projection = cgmath::perspective(cgmath::Deg(90.), 1.0, 0.1, 100.0);
             let view_proj = (projection) * view;
-            view_projections[index] = [
-                view_proj.x.into(),
-                view_proj.y.into(),
-                view_proj.z.into(),
-                view_proj.w.into(),
-            ];
+            view_projections[index] = view_proj.into();
         }
+        
         view_projections
     }
 }
