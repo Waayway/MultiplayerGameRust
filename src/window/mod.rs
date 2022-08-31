@@ -123,23 +123,11 @@ impl State {
 
         let ui = ui::UI::new(&window, hidpi_factor, &device, &queue, &config);
 
-        let camera = camera::Camera {
-            // position the camera one unit up and 2 units back
-            // +z is out of the screen
-            eye: (0.0, 1.0, 2.0).into(),
-            // have it look at the origin
-            target: (0.0, 0.0, 0.0).into(),
-            // which way is "up"
-            up: cgmath::Vector3::unit_y(),
-            aspect: config.width as f32 / config.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
-        };
+        let camera = camera::Camera::new((10.0,5.0,10.0).into(), 45.0, config.width as f32 / config.height as f32, 45.0);
 
         let (camera_uniform, camera_buffer, camera_bind_group_layout, camera_bind_group) = camera.create_camera_buffers_and_uniform(&device);
 
-        let camera_controller = camera::CameraController::new(0.2);
+        let camera_controller = camera::CameraController::new(0.2, 0.001);
 
         let light0 = light::Light::new(0, [2.0, 2.1, 2.0].into(), [1.0, 1.0, 1.0].into(), 1.0, 1.0);
 
@@ -414,10 +402,12 @@ impl State {
         }
     }
 
-    fn input(&mut self, event: &WindowEvent) -> bool {
-        if self.camera_controller.process_event(event) {return true}
-        
+    fn input(&mut self, event: &WindowEvent, window: &Window) -> bool {
+        if self.camera_controller.process_event(event, window) {return true}
         false
+    }
+    fn mouse_input(&mut self, event: &DeviceEvent) {
+        self.camera_controller.process_mouse_event(event);
     }
 
     fn update(&mut self) {
@@ -521,7 +511,7 @@ pub async fn run() {
             Event::WindowEvent {
                 ref event,
                 window_id,
-            } if window_id == window.id() => if !state.input(event) {
+            } if window_id == window.id() => if !state.input(event, &window) {
                 match event {
                     WindowEvent::CloseRequested
                     | WindowEvent::KeyboardInput {
@@ -541,7 +531,8 @@ pub async fn run() {
                     }
                     _ => {}
                 }
-            }
+            },
+            Event::DeviceEvent { ref event, .. } => state.mouse_input(&event),
             _ => {}
         }
         state.ui.handle_input(&window, &event);

@@ -65,8 +65,8 @@ impl UI {
             renderer,
             last_frame,
             last_cursor,
-            render_target: RenderTarget::Default,
-            render_target_int: 0,
+            render_target: RenderTarget::NoShadows,
+            render_target_int: 3,
         }
     }
     pub fn draw(&mut self, window: &Window ,device: &wgpu::Device, queue: &wgpu::Queue, surface_view: &wgpu::TextureView) {

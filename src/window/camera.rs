@@ -1,8 +1,13 @@
+use std::time::Instant;
+
+use cgmath::{InnerSpace, Vector3};
+use cgmath_dolly::prelude::*;
 use wgpu::util::DeviceExt;
-use winit::event::{WindowEvent, ElementState, VirtualKeyCode, KeyboardInput};
+use winit::{event::{WindowEvent, ElementState, VirtualKeyCode, KeyboardInput, DeviceEvent}, window::Window};
 
 pub struct Camera {
     pub eye: cgmath::Point3<f32>,
+    pub rot: (f32, f32),
     pub target: cgmath::Point3<f32>,
     pub up: cgmath::Vector3<f32>,
     pub aspect: f32,
@@ -21,6 +26,22 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 
 
 impl Camera {
+    pub fn new(pos: cgmath::Vector3<f32>, rotation: f32, aspect: f32, fovy: f32) -> Self {
+        let mut target = pos;
+        let rotation = rotation.to_radians();
+        target.x -= rotation.sin();
+        target.z -= rotation.cos();
+        Self {
+            aspect: aspect,
+            fovy: 45.0,
+            zfar: 100.0,
+            znear: 0.1,
+            eye: cgmath::Point3::new(pos.x,pos.y,pos.z),
+            rot: (rotation, 0.0),
+            target: cgmath::Point3::new(target.x,target.y,target.z),
+            up: cgmath::Vector3::unit_y(),
+        }
+    }
     pub fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
         let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
 
@@ -94,24 +115,38 @@ impl CameraUniform {
 }
 
 pub struct CameraController {
-    speed: f32,
+    camera_rig: CameraRig,
+    mouse_speed: f32,
     is_forward_pressed: bool,
     is_backwards_pressed: bool,
     is_left_pressed: bool,
     is_right_pressed: bool,
+    mouse_delta: (f64, f64),
+    mouse_event: bool,
+    last_frame: Instant,
 } 
 impl CameraController {
-    pub fn new(speed: f32) -> Self {
+    pub fn new(speed: f32, mouse_speed: f32) -> Self {
+        let mut camera: CameraRig = CameraRig::builder()
+            .with(YawPitch::new().yaw_degrees(45.0).pitch_degrees(-30.0))
+            .with(Smooth::new_rotation(1.5))
+            .with(Arm::new(Vector3::unit_z() * 20.0))
+            .build();
+
         Self { 
-            speed: speed,
+            camera_rig: camera,
+            mouse_speed: mouse_speed,
             is_forward_pressed: false,
             is_backwards_pressed: false,
             is_left_pressed: false,
-            is_right_pressed: false
+            is_right_pressed: false,
+            mouse_delta: (0.0,0.0),
+            mouse_event: false,
+            last_frame: Instant::now(),
         }
     }
 
-    pub fn process_event(&mut self, event: &WindowEvent) -> bool {
+    pub fn process_event(&mut self, event: &WindowEvent, window: &Window) -> bool {
         match event {
             WindowEvent::KeyboardInput {
                 input: KeyboardInput {
@@ -146,35 +181,45 @@ impl CameraController {
         }
     }
 
-    pub fn update_camera(&self, camera: &mut Camera) {
-        use cgmath::InnerSpace;
-        let forward = camera.target - camera.eye;
-        let forward_norm = forward.normalize();
-        let forward_mag = forward.magnitude();
+    pub fn process_mouse_event(&mut self, event: &DeviceEvent) -> bool {
+        match event {
+            DeviceEvent::MouseMotion { delta } => {
+                self.mouse_delta = *delta;
+                self.mouse_event = true;
+                true
+            },
+            _ => {false}
+        }
+    }
 
+    pub fn update_camera(&mut self, camera: &mut Camera) {
+        let delta_s = self.last_frame.elapsed();
+        self.last_frame = Instant::now();
+        
 
-        // Prevents Glitching when camera gets too close to center of scene
-        if self.is_forward_pressed && forward_mag > self.speed {
-            camera.eye += forward_norm * self.speed;
+        let camera_driver = self.camera_rig.driver_mut::<YawPitch>();
+        if self.mouse_event {
+            self.mouse_event = false;
+            let mut delta: cgmath::Vector2<f64> = self.mouse_delta.into();
+            camera_driver.rotate_yaw_pitch(delta.x as f32, delta.y as f32);
+        }
+        
+        if self.is_forward_pressed {
+            
         }
         if self.is_backwards_pressed {
-            camera.eye -= forward_norm * self.speed;
-        }
-
-        let right = forward_norm.cross(camera.up);
-
-        // Redo radius calc in case the fowrard/backward is pressed.
-        let forward = camera.target - camera.eye;
-        let forward_mag = forward.magnitude();
-
-        if self.is_right_pressed {
-            // Rescale the distance between the target and eye so 
-            // that it doesn't change. The eye therefore still 
-            // lies on the circle made by the target and eye.
-            camera.eye = camera.target - (forward + right * self.speed).normalize() * forward_mag;
+            
         }
         if self.is_left_pressed {
-            camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
+            
         }
+        if self.is_right_pressed {
+            
+        }
+        let camera_transform = self.camera_rig.update(delta_s.as_secs_f32());
+
+        camera.eye = cgmath::Point3::new(camera_transform.position.x, camera_transform.position.y, camera_transform.position.z);
+        let target = camera_transform.position + camera_transform.forward();
+        camera.target = cgmath::Point3::new(target.x, target.y, target.z);
     }
 }
