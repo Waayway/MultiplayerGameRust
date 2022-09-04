@@ -1,13 +1,12 @@
 use std::time::Instant;
 
-use cgmath::{InnerSpace};
 use wgpu::util::DeviceExt;
 use winit::{event::{WindowEvent, ElementState, VirtualKeyCode, KeyboardInput, DeviceEvent}, window::Window};
 
 pub struct Camera {
     pub eye: cgmath::Point3<f32>,
-    pub rot: (f32, f32),
     pub target: cgmath::Point3<f32>,
+    pub rotation: cgmath::Vector2<f32>, // x for horizontal rotation, y for vertical rotation
     pub up: cgmath::Vector3<f32>,
     pub aspect: f32,
     pub fovy: f32,
@@ -36,11 +35,12 @@ impl Camera {
             zfar: 100.0,
             znear: 0.1,
             eye: cgmath::Point3::new(pos.x,pos.y,pos.z),
-            rot: (rotation, 0.0),
+            rotation: cgmath::Vector2::new(rotation, 0.0),
             target: cgmath::Point3::new(target.x,target.y,target.z),
             up: cgmath::Vector3::unit_y(),
         }
     }
+
     pub fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
         let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
 
@@ -48,9 +48,20 @@ impl Camera {
 
         return OPENGL_TO_WGPU_MATRIX * proj * view
     }
+
     pub fn resize(&mut self, width: u32, height: u32) {
         self.aspect = width as f32 / height as f32;
     }
+
+    pub fn update_target(&mut self) {
+        // (cos(pitch)cos(yaw), cos(pitch)sin(yaw), sin(pitch))
+        let pitch = self.rotation.x.to_radians();
+        let yaw = self.rotation.y.to_radians();
+        let target: cgmath::Point3<f32> = cgmath::point3(pitch.cos()*yaw.cos(), pitch.cos()*yaw.sin(), pitch.sin());
+        println!("{:?}" ,target);
+        self.target = cgmath::point3(self.eye.x+target.x, self.eye.y+target.y, self.eye.z+target.z);
+    }
+
     pub fn create_camera_buffers_and_uniform(&self, device: &wgpu::Device) -> (CameraUniform, wgpu::Buffer, wgpu::BindGroupLayout, wgpu::BindGroup) {
         let mut camera_uniform = CameraUniform::new();
         camera_uniform.update_view_proj(&self);
@@ -166,6 +177,14 @@ impl CameraController {
                         self.is_right_pressed = is_pressed;
                         true
                     }
+                    VirtualKeyCode::F10 => {
+                        window.set_cursor_grab(true);
+                        true
+                    }
+                    VirtualKeyCode::F11 => {
+                        window.set_fullscreen(Some(winit::window::Fullscreen::Borderless(None)));
+                        true
+                    }
                     _ => false,
                 }
             }
@@ -193,6 +212,12 @@ impl CameraController {
             let mut delta: cgmath::Vector2<f64> = self.mouse_delta.into();
             delta.y *= -1.0;
             delta *= self.mouse_speed as f64;
+            let delta: cgmath::Vector2<f32> = cgmath::Vector2 { x: delta.x as f32, y: delta.y as f32 };
+            camera.rotation.x += delta.x;
+            camera.rotation.y -= delta.y;
+            camera.rotation.y = camera.rotation.y.clamp(-80., 80.);
+            camera.rotation.x = camera.rotation.x % 720.;
+            camera.update_target();
         }
         
         if self.is_forward_pressed {
