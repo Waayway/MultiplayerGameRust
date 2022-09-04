@@ -127,7 +127,7 @@ impl State {
 
         let (camera_uniform, camera_buffer, camera_bind_group_layout, camera_bind_group) = camera.create_camera_buffers_and_uniform(&device);
 
-        let camera_controller = camera::CameraController::new(0.2, 0.001);
+        let camera_controller = camera::CameraController::new(0.2, 2.0);
 
         let light0 = light::Light::new(0, [2.0, 2.1, 2.0].into(), [1.0, 1.0, 1.0].into(), 1.0, 1.0);
 
@@ -537,8 +537,5 @@ pub async fn run() {
         }
         state.ui.handle_input(&window, &event);
     });
-    
-     
-    
-     
+        
 }

@@ -1,7 +1,6 @@
 use std::time::Instant;
 
-use cgmath::{InnerSpace, Vector3};
-use cgmath_dolly::prelude::*;
+use cgmath::{InnerSpace};
 use wgpu::util::DeviceExt;
 use winit::{event::{WindowEvent, ElementState, VirtualKeyCode, KeyboardInput, DeviceEvent}, window::Window};
 
@@ -115,7 +114,6 @@ impl CameraUniform {
 }
 
 pub struct CameraController {
-    camera_rig: CameraRig,
     mouse_speed: f32,
     is_forward_pressed: bool,
     is_backwards_pressed: bool,
@@ -127,14 +125,8 @@ pub struct CameraController {
 } 
 impl CameraController {
     pub fn new(speed: f32, mouse_speed: f32) -> Self {
-        let mut camera: CameraRig = CameraRig::builder()
-            .with(YawPitch::new().yaw_degrees(45.0).pitch_degrees(-30.0))
-            .with(Smooth::new_rotation(1.5))
-            .with(Arm::new(Vector3::unit_z() * 20.0))
-            .build();
 
         Self { 
-            camera_rig: camera,
             mouse_speed: mouse_speed,
             is_forward_pressed: false,
             is_backwards_pressed: false,
@@ -196,12 +188,11 @@ impl CameraController {
         let delta_s = self.last_frame.elapsed();
         self.last_frame = Instant::now();
         
-
-        let camera_driver = self.camera_rig.driver_mut::<YawPitch>();
         if self.mouse_event {
             self.mouse_event = false;
             let mut delta: cgmath::Vector2<f64> = self.mouse_delta.into();
-            camera_driver.rotate_yaw_pitch(delta.x as f32, delta.y as f32);
+            delta.y *= -1.0;
+            delta *= self.mouse_speed as f64;
         }
         
         if self.is_forward_pressed {
@@ -216,10 +207,5 @@ impl CameraController {
         if self.is_right_pressed {
             
         }
-        let camera_transform = self.camera_rig.update(delta_s.as_secs_f32());
-
-        camera.eye = cgmath::Point3::new(camera_transform.position.x, camera_transform.position.y, camera_transform.position.z);
-        let target = camera_transform.position + camera_transform.forward();
-        camera.target = cgmath::Point3::new(target.x, target.y, target.z);
     }
 }
