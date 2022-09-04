@@ -1,5 +1,6 @@
 use std::time::Instant;
 
+use cgmath::InnerSpace;
 use wgpu::util::DeviceExt;
 use winit::{event::{WindowEvent, ElementState, VirtualKeyCode, KeyboardInput, DeviceEvent}, window::Window};
 
@@ -58,7 +59,6 @@ impl Camera {
         let pitch = self.rotation.x.to_radians();
         let yaw = self.rotation.y.to_radians();
         let target: cgmath::Point3<f32> = cgmath::point3(pitch.cos()*yaw.cos(), pitch.cos()*yaw.sin(), pitch.sin());
-        println!("{:?}" ,target);
         self.target = cgmath::point3(self.eye.x+target.x, self.eye.y+target.y, self.eye.z+target.z);
     }
 
@@ -125,6 +125,7 @@ impl CameraUniform {
 }
 
 pub struct CameraController {
+    speed: f32,
     mouse_speed: f32,
     is_forward_pressed: bool,
     is_backwards_pressed: bool,
@@ -138,6 +139,7 @@ impl CameraController {
     pub fn new(speed: f32, mouse_speed: f32) -> Self {
 
         Self { 
+            speed: speed,
             mouse_speed: mouse_speed,
             is_forward_pressed: false,
             is_backwards_pressed: false,
@@ -220,11 +222,16 @@ impl CameraController {
             camera.update_target();
         }
         
+        let forward = camera.eye - camera.target;
+        let forward_norm = forward.normalize();
+
         if self.is_forward_pressed {
-            
+            camera.eye -= forward_norm * self.speed;
+            camera.target -= forward_norm * self.speed;
         }
         if self.is_backwards_pressed {
-            
+            camera.eye += forward_norm * self.speed;
+            camera.target += forward_norm * self.speed;
         }
         if self.is_left_pressed {
             
